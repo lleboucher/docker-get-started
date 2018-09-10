@@ -36,8 +36,8 @@ $ docker run -d -p 4000:80 friendlyhello
 $ docker container ls
 
 # The output is typically:
-# CONTAINER ID        IMAGE               COMMAND             CREATED
-# 1fa4ab2cf395        friendlyhello       "python app.py"     28 seconds ago
+> CONTAINER ID        IMAGE               COMMAND             CREATED
+> 1fa4ab2cf395        friendlyhello       "python app.py"     28 seconds ago
 
 
 # Share the image on a public repository
