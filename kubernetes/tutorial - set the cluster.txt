@@ -119,6 +119,215 @@ kubeadm join 192.168.0.108:6443 --token q3nz0g.n2l9ow787j7enj8j \
     --discovery-token-ca-cert-hash sha256:191a8bc561c244591b428dd3a8b82f0b26d34afeed4115626c876c97a6839729
 
 
+    
+    
+    
+    PART 2 : copied from the Kubernetes official site tutorial
+    
+    Objectives
+
+    Learn what a Kubernetes cluster is.
+    Learn what Minikube is.
+    Start a Kubernetes cluster using an online terminal.
+
+Kubernetes Clusters
+
+Kubernetes coordinates a highly available cluster of computers that are 
+connected to work as a single unit. The abstractions in Kubernetes allow 
+you to deploy containerized applications to a cluster without tying them 
+specifically to individual machines. To make use of this new model of 
+deployment, applications need to be packaged in a way that decouples them 
+from individual hosts: they need to be containerized. Containerized 
+applications are more flexible and available than in past deployment 
+models, where applications were installed directly onto specific machines 
+as packages deeply integrated into the host. Kubernetes automates the 
+distribution and scheduling of application containers across a cluster in 
+a more efficient way.
+Kubernetes is an open-source platform and is production-ready.
+
+A Kubernetes cluster consists of two types of resources:
+
+    The Master coordinates the cluster
+    Nodes are the workers that run applications
+
+
+Cluster Diagram
+
+
+The Master is responsible for managing the cluster. The master coordinates 
+all activities in your cluster, such as scheduling applications, 
+maintaining applications' desired state, scaling applications, and rolling 
+out new updates.
+
+A node is a VM or a physical computer that serves as a worker machine in 
+a Kubernetes cluster. Each node has a Kubelet, which is an agent for 
+managing the node and communicating with the Kubernetes master. The node 
+should also have tools for handling container operations, such as Docker or 
+rkt. A Kubernetes cluster that handles production traffic should have a 
+minimum of three nodes.
+
+Masters manage the cluster and the nodes are used to host the running 
+applications.
+
+When you deploy applications on Kubernetes, you tell the master to start 
+the application containers. The master schedules the containers to run on 
+the cluster's nodes. The nodes communicate with the master using the 
+Kubernetes API, which the master exposes. End users can also use the 
+Kubernetes API directly to interact with the cluster.
+
+A Kubernetes cluster can be deployed on either physical or virtual 
+machines. In our case, I explained in Part I how to deploy a Kubernetes 
+cluster in such a way.
+
+Various Kubernetes commands enable you to interact with the cluster:
+
+To check that the cluster is alive, you can run the version command:
+
+$ kubectl version
+Client Version: version.Info{Major:"1", Minor:"16", GitVersion:"v1.16.3", GitCommit:"b3cbbae08ec52a7fc73d334838e18d17e8512749", GitTreeState:"clean", BuildDate:"2019-11-13T11:23:11Z", GoVersion:"go1.12.12", Compiler:"gc", Platform:"linux/amd64"}
+Server Version: version.Info{Major:"1", Minor:"16", GitVersion:"v1.16.3", GitCommit:"b3cbbae08ec52a7fc73d334838e18d17e8512749", GitTreeState:"clean", BuildDate:"2019-11-13T11:13:49Z", GoVersion:"go1.12.12", Compiler:"gc", Platform:"linux/amd64"}
+
+And view the cluster details:
+
+$ kubectl cluster-info
+Kubernetes master is running at https://192.168.0.108:6443
+KubeDNS is running at https://192.168.0.108:6443/api/v1/namespaces/kube-system/services/kube-dns:dns/proxy
+
+We have a running master and a dashboard. The Kubernetes dashboard allows 
+you to view your applications in a UI. During this tutorial, we’ll be 
+focusing on the command line for deploying and exploring our application. 
+To view the nodes in the cluster, run the kubectl get nodes command:
+
+$ kubectl get nodes
+NAME         STATUS   ROLES    AGE   VERSION
+k8s-master   Ready    master   64m   v1.16.3
+k8s-slave1   Ready    <none>   58m   v1.16.3
+k8s-slave2   Ready    <none>   53m   v1.16.3
+
+This command shows all nodes that can be used to host our applications. 
+Now we have three nodes, and we can see that their status is ready (it is 
+ready to accept applications for deployment).
 
 
 
+Installing the dashboard:
+
+
+To install the Dashboard, run the following command from the master:
+
+$ kubectl apply -f https://raw.githubusercontent.com/kubernetes/dashboard/master/aio/deploy/recommended/kubernetes-dashboard.yaml
+
+Kubernetes va aller chercher la configuration nécessaire la mise à en place du Dashboard directement depuis son dépôt Github et le faire apparaître dans la liste des pods de votre cluster.
+
+$  kubectl get pods --all-namespaces -o wide | grep dashb
+kube-system   kubernetes-dashboard-77fd78f978-f8p9l   1/1     Running   0          60s     10.244.1.230   k8snode1    <none>
+
+Il est  "Running", ça veut dire qu'il est disponible, mais pas encore accessible.
+Créez un compte utilisateur
+Créez un fichier admin-user.yaml avec ce qui suit dedans :
+
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: admin-user
+  namespace: kube-system
+
+Puis créez le rôle qui lui sera attaché : admin-role.yaml
+
+apiVersion: rbac.authorization.k8s.io/v1beta1
+kind: ClusterRoleBinding
+metadata:
+  name: admin-user
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: cluster-admin
+subjects:
+- kind: ServiceAccount
+  name: admin-user
+  namespace: kube-system
+
+Chargez ces configurations dans le cluster :
+
+kubectl apply -f admin-user.yaml
+kubectl apply -f admin-role.yaml
+
+Récupérer le token de connexion
+Pour vous connecter au Dashboard, en plus d'avoir le pod et un utilisateur, il vous faut le token qui va bien. Pour le récupérer :
+
+dada@k8smaster:~$ kubectl -n kube-system describe secret $(kubectl -n kube-system get secret | grep admin-user | awk '{print $1}')
+Name:         admin-user-token-b8qmq
+Namespace:    kube-system
+Labels:       <none>
+Annotations:  kubernetes.io/service-account.name: admin-user
+              kubernetes.io/service-account.uid: a8a600b1-e010-11e8-96ec-0800273c4560
+
+Type:  kubernetes.io/service-account-token
+
+Data
+====
+ca.crt:     1025 bytes
+namespace:  11 bytes
+token:      eyJhbGciOiJSUzI1NiIsImtpZCI6IiJ9.eyJpc3MiOiJrdWJl.........
+
+J'ai tronqué l'affichage du token. Il est d'une longueur dingue. Copiez-le dans un coin maintenant que vous l'avez.
+Accéder au Dashboard
+Le Dashboard n'est par défaut pas accessible en dehors du cluster. On peut cependant tricher en passant par un proxy et un tunnel SSH.
+Le proxy
+Ouvrez un nouveau terminal branché sur votre master et tapez la commande suivante :
+
+dada@k8smaster:~$ kubectl proxy
+Starting to serve on 127.0.0.1:8001
+
+Le tunnel SSH
+Depuis votre PC hôte, lancez le tunnel :
+
+dada@dada-laptop:~$ ssh -L 8001:127.0.0.1:8001 dada@IP_DU_MASTER
+
+Affichez le fameux tant attendu
+Si tout s'est bien passé jusqu'ici, vous deviez pouvoir accéder au Dashboard via cette url :
+
+http://127.0.0.1:8001/api/v1/namespaces/kube-system/services/https:kubernetes-dashboard:/proxy/#!/overview?namespace=_all
+
+Et voir ceci : 
+
+
+Vous voici avec une belle interface pour admirer le comportement de votre cluster k8s. Foncez cliquer absolument partout et chercher le pourquoi du comment de telles options à tel endroit !
+
+
+
+
+PART III : create a deployment
+
+Using kubectl to Create a Deployment
+Objectives
+
+    Learn about application Deployments.
+    Deploy your first app on Kubernetes with kubectl.
+
+Kubernetes Deployments
+
+Once you have a running Kubernetes cluster, you can deploy your containerized applications on top of it. To do so, you create a Kubernetes Deployment configuration. The Deployment instructs Kubernetes how to create and update instances of your application. Once you've created a Deployment, the Kubernetes master schedules mentioned application instances onto individual Nodes in the cluster.
+
+Once the application instances are created, a Kubernetes Deployment Controller continuously monitors those instances. If the Node hosting an instance goes down or is deleted, the Deployment controller replaces the instance with an instance on another Node in the cluster. This provides a self-healing mechanism to address machine failure or maintenance.
+
+In a pre-orchestration world, installation scripts would often be used to start applications, but they did not allow recovery from machine failure. By both creating your application instances and keeping them running across Nodes, Kubernetes Deployments provide a fundamentally different approach to application management.
+Summary:
+
+    Deployments
+    Kubectl
+
+A Deployment is responsible for creating and updating instances of your application
+
+Deploying your first app on Kubernetes
+
+
+You can create and manage a Deployment by using the Kubernetes command line interface, Kubectl. Kubectl uses the Kubernetes API to interact with the cluster. In this module, you'll learn the most common Kubectl commands needed to create Deployments that run your applications on a Kubernetes cluster.
+
+When you create a Deployment, you'll need to specify the container image for your application and the number of replicas that you want to run. You can change that information later by updating your Deployment; Modules 5 and 6 of the bootcamp discuss how you can scale and update your Deployments.
+
+Applications need to be packaged into one of the supported container formats in order to be deployed on Kubernetes
+
+For your first Deployment, you'll use a Node.js application packaged in a Docker container. (If you didn't already try creating a Node.js application and deploying it using a container, you can do that first by following the instructions from the Hello Minikube tutorial).
+
+Now that you know what Deployments are, let's go to the online tutorial and deploy our first app!
