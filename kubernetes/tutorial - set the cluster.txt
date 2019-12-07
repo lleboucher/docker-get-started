@@ -1,0 +1,124 @@
+# Here are the information you must copy/paste from the terminal screens in 
+# order to go through this tutorial:
+#
+# 1) the ip@ of the VMs
+#
+# In the following examples, I used:
+#    master:  192.168.0.108
+#    slave 1: 192.168.0.109
+#    slave 2: 192.168.0.110
+#
+# 2) the token required for a node to join into the cluster
+#
+# In the following examples, I used:
+#
+# kubeadm join 192.168.0.108:6443 --token q3nz0g.n2l9ow787j7enj8j \
+    --discovery-token-ca-cert-hash \
+    sha256:191a8bc561c244591b428dd3a8b82f0b26d34afeed4115626c876c97a6839729
+
+
+
+From the master:
+As root:
+
+Create the cluster: (taking into account teh actual ip@ of the master node
+
+kubeadm init --pod-network-cidr=10.244.0.0/16 --apiserver-advertise-address=192.168.0.108
+
+As normal user:
+
+- create a .kube directory with the configuration file
+mkdir -p $HOME/.kube
+sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
+sudo chown $(id -u):$(id -g) $HOME/.kube/config
+
+- configure the network (we use the 'flannel' flavor)
+kubectl apply -f https://github.com/coreos/flannel/raw/master/Documentation/kube-flannel.yml
+
+
+=> IT WILL TAKE FEW SECONDS TO GET UP :
+
+thierry@k8s-master:~$ kubectl get pods --all-namespaces -o wide
+NAMESPACE     NAME                                 READY   STATUS    RESTARTS   AGE   IP          NODE         NOMINATED NODE   READINESS GATES
+kube-system   coredns-5644d7b6d9-nxhfs             0/1     Pending   0          64s   <none>      <none>       <none>           <none>
+kube-system   coredns-5644d7b6d9-t8zsz             0/1     Pending   0          64s   <none>      <none>       <none>           <none>
+kube-system   etcd-k8s-master                      1/1     Running   0          77s   10.0.2.15   k8s-master   <none>           <none>
+kube-system   kube-apiserver-k8s-master            1/1     Running   0          81s   10.0.2.15   k8s-master   <none>           <none>
+kube-system   kube-controller-manager-k8s-master   1/1     Running   1          97s   10.0.2.15   k8s-master   <none>           <none>
+kube-system   kube-flannel-ds-amd64-nxx7k          1/1     Running   0          13s   10.0.2.15   k8s-master   <none>           <none>
+kube-system   kube-proxy-znwt2                     1/1     Running   0          64s   10.0.2.15   k8s-master   <none>           <none>
+kube-system   kube-scheduler-k8s-master            1/1     Running   1          97s   10.0.2.15   k8s-master   <none>           <none>
+thierry@k8s-master:~$ kubectl get pods --all-namespaces -o wide
+NAMESPACE     NAME                                 READY   STATUS              RESTARTS   AGE    IP          NODE         NOMINATED NODE   READINESS GATES
+kube-system   coredns-5644d7b6d9-nxhfs             0/1     ContainerCreating   0          70s    <none>      k8s-master   <none>           <none>
+kube-system   coredns-5644d7b6d9-t8zsz             0/1     ContainerCreating   0          70s    <none>      k8s-master   <none>           <none>
+kube-system   etcd-k8s-master                      1/1     Running             0          83s    10.0.2.15   k8s-master   <none>           <none>
+kube-system   kube-apiserver-k8s-master            1/1     Running             0          87s    10.0.2.15   k8s-master   <none>           <none>
+kube-system   kube-controller-manager-k8s-master   1/1     Running             1          103s   10.0.2.15   k8s-master   <none>           <none>
+kube-system   kube-flannel-ds-amd64-nxx7k          1/1     Running             0          19s    10.0.2.15   k8s-master   <none>           <none>
+kube-system   kube-proxy-znwt2                     1/1     Running             0          70s    10.0.2.15   k8s-master   <none>           <none>
+kube-system   kube-scheduler-k8s-master            1/1     Running             1          103s   10.0.2.15   k8s-master   <none>           <none>
+thierry@k8s-master:~$ kubectl get pods --all-namespaces -o wide
+NAMESPACE     NAME                                 READY   STATUS    RESTARTS   AGE    IP           NODE         NOMINATED NODE   READINESS GATES
+kube-system   coredns-5644d7b6d9-nxhfs             1/1     Running   0          78s    10.244.0.2   k8s-master   <none>           <none>
+kube-system   coredns-5644d7b6d9-t8zsz             0/1     Running   0          78s    10.244.0.3   k8s-master   <none>           <none>
+kube-system   etcd-k8s-master                      1/1     Running   0          91s    10.0.2.15    k8s-master   <none>           <none>
+kube-system   kube-apiserver-k8s-master            1/1     Running   0          95s    10.0.2.15    k8s-master   <none>           <none>
+kube-system   kube-controller-manager-k8s-master   1/1     Running   1          111s   10.0.2.15    k8s-master   <none>           <none>
+kube-system   kube-flannel-ds-amd64-nxx7k          1/1     Running   0          27s    10.0.2.15    k8s-master   <none>           <none>
+kube-system   kube-proxy-znwt2                     1/1     Running   0          78s    10.0.2.15    k8s-master   <none>           <none>
+kube-system   kube-scheduler-k8s-master            1/1     Running   1          111s   10.0.2.15    k8s-master   <none>           <none>
+thierry@k8s-master:~$ kubectl get pods --all-namespaces -o wide
+NAMESPACE     NAME                                 READY   STATUS    RESTARTS   AGE    IP           NODE         NOMINATED NODE   READINESS GATES
+kube-system   coredns-5644d7b6d9-nxhfs             1/1     Running   0          83s    10.244.0.2   k8s-master   <none>           <none>
+kube-system   coredns-5644d7b6d9-t8zsz             1/1     Running   0          83s    10.244.0.3   k8s-master   <none>           <none>
+kube-system   etcd-k8s-master                      1/1     Running   0          96s    10.0.2.15    k8s-master   <none>           <none>
+kube-system   kube-apiserver-k8s-master            1/1     Running   0          100s   10.0.2.15    k8s-master   <none>           <none>
+kube-system   kube-controller-manager-k8s-master   1/1     Running   1          116s   10.0.2.15    k8s-master   <none>           <none>
+kube-system   kube-flannel-ds-amd64-nxx7k          1/1     Running   0          32s    10.0.2.15    k8s-master   <none>           <none>
+kube-system   kube-proxy-znwt2                     1/1     Running   0          83s    10.0.2.15    k8s-master   <none>           <none>
+kube-system   kube-scheduler-k8s-master            1/1     Running   1          116s   10.0.2.15    k8s-master   <none>           <none>
+
+
+
+List all the nodes:
+
+
+thierry@k8s-master:~$ kubectl get nodes
+NAME         STATUS   ROLES    AGE     VERSION
+k8s-master   Ready    master   8m36s   v1.16.3
+thierry@k8s-master:~$ kubectl get nodes
+NAME         STATUS   ROLES    AGE     VERSION
+k8s-master   Ready    master   5m53s   v1.16.3
+k8s-slave1   Ready    <none>   21s     v1.16.3
+thierry@k8s-master:~$ kubectl get nodes
+NAME         STATUS     ROLES    AGE    VERSION
+k8s-master   Ready      master   10m    v1.16.3
+k8s-slave1   Ready      <none>   5m1s   v1.16.3
+k8s-slave2   NotReady   <none>   5s     v1.16.3
+thierry@k8s-master:~$ kubectl get nodes
+NAME         STATUS     ROLES    AGE    VERSION
+k8s-master   Ready      master   10m    v1.16.3
+k8s-slave1   Ready      <none>   5m7s   v1.16.3
+k8s-slave2   NotReady   <none>   11s    v1.16.3
+
+
+
+
+
+
+
+
+
+From the slave nodes:
+
+
+Enrol nodes in the cluster:
+
+kubeadm join 192.168.0.108:6443 --token q3nz0g.n2l9ow787j7enj8j \
+    --discovery-token-ca-cert-hash sha256:191a8bc561c244591b428dd3a8b82f0b26d34afeed4115626c876c97a6839729
+
+
+
+
+
