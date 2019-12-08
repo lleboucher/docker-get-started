@@ -1,3 +1,94 @@
+#!/usr/bin/env bash
+
+
+###############################################################################
+#
+# Learn Kubernetes Basics - Part 0 - pre-requisites
+#
+###############################################################################
+
+
+This tutorial mixes elements from the official Kubernetes site 'get started' 
+section, and also from Dada's blog (specifically for setting up the 
+Kubernetes clusters on VMs running on a laptop):
+    https://kubernetes.io/docs/tutorials/kubernetes-basics/
+    https://www.dadall.info/article658/preparer-virtualbox-pour-kubernetes
+
+Here are the identified pre-requisites to run this tutorial and actually
+learn something from this experience:
+
+      - have a linux laptop, with a 'admin' account (i.e. need to have
+        the sudo privilege). Ubuntu will be perfect for beginners.
+      - have curl, git and virtualbox installed
+
+During this tutorial, we will install docker, various kubernetes components
+and spawn multiple VMs in roder to deploy a Kubernetes cluster on these.
+
+This is it. Nothing else is needed... except the desire to learn :-)
+
+
+
+###############################################################################
+#
+# Learn Kubernetes Basics - Part 1 - Kubernetes Basics
+#
+###############################################################################
+
+
+# =================
+# Kubernetes Basics
+# =================
+
+This tutorial provides a walkthrough of the basics of the Kubernetes cluster
+orchestration system. Each module contains some background information on
+major Kubernetes features and concepts. You will actually manage a simple 
+cluster and its containerized applications for yourself.
+
+Following the tutorial steps, you can learn to:
+
+  - Deploy a Kubernetes cluster
+  - Deploy a containerized application on a cluster.
+  - Scale the deployment.
+  - Update the containerized application with a new software version.
+  - Debug the containerized application.
+
+
+# ===============================
+# What can Kubernetes do for you?
+# ===============================
+
+With modern web services, users expect applications to be available 24/7, and
+developers expect to deploy new versions of those applications several times
+a day. Containerization helps package software to serve these goals, enabling
+applications to be released and updated in an easy and fast way without
+downtime. Kubernetes helps you make sure those containerized applications run
+where and when you want, and helps them find the resources and tools they
+need to work. Kubernetes is a production-ready, open source platform designed
+with Google's accumulated experience in container orchestration, combined 
+with best-of-breed ideas from the community.
+
+
+
+###############################################################################
+#
+# Learn Kubernetes Basics - Part 2 - Create a cluster
+#
+###############################################################################
+
+
+In this section, we will build step by step the infrastructure on which we 
+will deploy a Kubernetes cluster. The steps are:
+    - building an initial  VM image ("K8s BARE") with all the prerequisites 
+      installed (Ubuntu OS, docker, kubernetes)
+    - renaming a VM to be the master node ("K8s master") - it is derived from
+      this initial image
+    - configuring two 'slave' VMs from this initial image
+    - initialize and deploy a Kubernetes on these three nodes
+    - setup a dashboard and access it
+
+You will find in the tutorial's directory thre types of images:
+    - 
+for You may use VM images called "master -cnofigured" 
 # Here are the information you must copy/paste from the terminal screens in 
 # order to go through this tutorial:
 #
@@ -293,6 +384,46 @@ Et voir ceci :
 
 
 Vous voici avec une belle interface pour admirer le comportement de votre cluster k8s. Foncez cliquer absolument partout et chercher le pourquoi du comment de telles options à tel endroit !
+
+
+
+
+
+
+###############################################################################
+#
+# Learn Kubernetes Basics - Part 3 - Deploy an app
+#
+###############################################################################
+
+
+###############################################################################
+#
+# Learn Kubernetes Basics - Part 4 - Explore your app
+#
+###############################################################################
+
+
+###############################################################################
+#
+# Learn Kubernetes Basics - Part 5 - Expose Your App Publicly
+#
+###############################################################################
+
+
+###############################################################################
+#
+# Learn Kubernetes Basics - Part 6 - Scale Your App
+#
+###############################################################################
+
+
+###############################################################################
+#
+# Learn Kubernetes Basics - Part 7 - Update Your App
+#
+###############################################################################
+
 
 
 
