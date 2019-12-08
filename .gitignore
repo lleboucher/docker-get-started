@@ -1,2 +1,3 @@
 # ignore the .idea directory, used by PyCharm to manage the project 
 .idea/
+kubernetes/VM_images/

@@ -21,9 +21,6 @@ learn something from this experience:
         the sudo privilege). Ubuntu will be perfect for beginners.
       - have curl, git and virtualbox installed
 
-During this tutorial, we will install docker, various kubernetes components
-and spawn multiple VMs in roder to deploy a Kubernetes cluster on these.
-
 This is it. Nothing else is needed... except the desire to learn :-)
 
 
@@ -35,14 +32,14 @@ This is it. Nothing else is needed... except the desire to learn :-)
 ###############################################################################
 
 
-# =================
-# Kubernetes Basics
-# =================
+=================
+Kubernetes Basics
+=================
 
 This tutorial provides a walkthrough of the basics of the Kubernetes cluster
 orchestration system. Each module contains some background information on
-major Kubernetes features and concepts. You will actually manage a simple 
-cluster and its containerized applications for yourself.
+major Kubernetes features and concepts. You will actually deploy and manage 
+a simple cluster and its containerized applications by yourself.
 
 Following the tutorial steps, you can learn to:
 
@@ -53,9 +50,9 @@ Following the tutorial steps, you can learn to:
   - Debug the containerized application.
 
 
-# ===============================
-# What can Kubernetes do for you?
-# ===============================
+===============================
+What can Kubernetes do for you?
+===============================
 
 With modern web services, users expect applications to be available 24/7, and
 developers expect to deploy new versions of those applications several times
@@ -76,25 +73,43 @@ with best-of-breed ideas from the community.
 ###############################################################################
 
 
+
+======================================
+2.1 - Naming conventions & unique data
+======================================
+
+
 In this section, we will build step by step the infrastructure on which we 
-will deploy a Kubernetes cluster. The steps are:
+will deploy a Kubernetes cluster. We intentionaly make every step manual, so 
+that you can appreciate the full process at leat once in your lifetime. In 
+real production world, most of these steps are automated and you would simply 
+"push a button".
+
+The steps are:
     - building an initial  VM image ("K8s BARE") with all the prerequisites 
       installed (Ubuntu OS, docker, kubernetes)
-    - renaming a VM to be the master node ("K8s master") - it is derived from
-      this initial image
-    - configuring two 'slave' VMs from this initial image
-    - initialize and deploy a Kubernetes on these three nodes
+    - renaming a VM to be the master node ("K8s master - cluster not deployed"), 
+      derived from "K8S BARE"
+    - renaming two 'slave' VMs ("K8s slave - cluster not deployed") derived from 
+      "K8s BARE"
+    - initialize and deploy a Kubernetes on the master, and join the two 
+      slaves into the cluster (all VMs are then called "cluster deployed")
     - setup a dashboard and access it
 
-You will find in the tutorial's directory thre types of images:
-    - 
-for You may use VM images called "master -cnofigured" 
-# Here are the information you must copy/paste from the terminal screens in 
-# order to go through this tutorial:
+You may skip this step and use directly the "cluster deployed" images in order to skip this step and go directly to part 3.
+
+
+#
+#      WARNING
+#
+# Few informations will be unique to each deployement and you need to 
+# carefully copy and save these informations in order to adapt the commands 
+# as shown in the tutorial (i.e. replace the tutorial's info with yours) and 
+# run your own version of the commands:
 #
 # 1) the ip@ of the VMs
 #
-# In the following examples, I used:
+# In the tutorial, I used (copied from a real execution):
 #    master:  192.168.0.108
 #    slave 1: 192.168.0.109
 #    slave 2: 192.168.0.110
@@ -106,10 +121,204 @@ for You may use VM images called "master -cnofigured"
 # kubeadm join 192.168.0.108:6443 --token q3nz0g.n2l9ow787j7enj8j \
     --discovery-token-ca-cert-hash \
     sha256:191a8bc561c244591b428dd3a8b82f0b26d34afeed4115626c876c97a6839729
+# 
+# 
+
+
+===========================
+2.2 - Building the first VM
+===========================
+
+(you can skip this phase and use directly the "K8s BARE" image)
+
+Nothing fancy here: we've built from the Ubuntu Server 18.04 LTS, with:
+  - two CPUs (it is mandatory to run a Kubernetes master)
+  - 2048 MB memory
+  - two network interfaces:
+       * one NAT (which is default setting) for internet connectivity
+       * one configured in a "Bridge Adapter" mode, pointing on the most 
+         relevant network adapter (in my case: the Ethernet card on the 
+         desktop, or the wifi card on the laptop)
+
+(image "K8s BARE - 0 - Description")
+(image "K8s BARE - 1 - Memory")
+(image "K8s BARE - 2 - CPU")
+(image "K8s BARE - 3 - 1st Network interface")
+(image "K8s BARE - 4 - 2nd Network interface")
+
+In order to make this VM a generic basis on which we can run any type of k8s
+nodes, we then need to log as root and (in this order):
+  - to install docker
+  - to disable the swap
+  - to install kubernetes
+
+For convenience, in this tutorial, we will configure the VMs by connecting 
+into them via ssh from terminals running on the host machine, using the 
+default admin profile (login=thierry, password=thierry) (Secure, huh!!!). 
+There are few advantages doing so, namely the fact that the prompt then tells 
+on which machine you are actually logged, which is very convenient when you 
+will have 3 VMs running at the same time.
+
+To do so, you need to identify the ip@ of the VM: it will be displayed on 
+your first loging into the VM from the VM window:
+
+(image "K8s BARE - 5 - Login from the VM")
+
+Open a terminal and - as a regular user on hte host machine, ssh into the VM:
+(in my case, the hostname of my laptop is 'laptop' and my login is 'tso')
+
+tso@laptop:~$ ssh thierry@192.168.0.111
+
+The first time you connect on a remote machine, you're asked to confirm: 
+confirm by typing 'yes' and then enter the password:
+
+The authenticity of host '192.168.0.111 (192.168.0.111)' can't be established.
+ECDSA key fingerprint is SHA256:blStegSimd9FZS74HYnmTW4CxvNY0gI2LDP7YCcbuzY.
+Are you sure you want to continue connecting (yes/no)? yes
+Warning: Permanently added '192.168.0.111' (ECDSA) to the list of known hosts.
+thierry@192.168.0.111's password: 
+
+You are now connected on the VM and your prompt will show it:
+
+(K8s BARE - 6 - Login from a terminal)
+
+thierry@k8s_node:~$
+
+You are logged as 'thierry' and not anymore 'tso' and you are on 'k8s_node'*
+and not on 'laptop' anymore.
+
+*: the initial name of the machine is whatever you have specified when 
+building the fist image from the Ubuntu OS in VirtualBox. I used the generic 
+name 'k8s_node' because the same VM will later be used to configure both 
+master and slave nodes.
+
+
+We must do the following steps as 'root':
+
+$ sudo su
+
+The prompt becomes # and we can continue the next steps.
+
+We will install docker: collect the certificates, add the signing key to the 
+local apt repository, add the docker repository... and finally install docker:
+
+# apt-get install -y apt-transport-https ca-certificates curl gnupg2 software-properties-common
+# curl -fsSL https://download.docker.com/linux/$(. /etc/os-release; echo "$ID")/gpg | apt-key add -
+# add-apt-repository "deb https://download.docker.com/linux/debian stretch stable"
+# apt-get update
+# apt-get install -y docker-ce
+
+Then we must disable the swap: we do so immediately with the "swappoff" 
+command:
+
+# swapoff -a
+
+and we also prevent the swap to be re-activated at next boot, by editing the 
+fstab file (/etc/fstab) and disable the line indicating the swap partition 
+by commenting it (i.e. add a '#' at the beginning of the line). Thus, the 
+original file changes from:
+
+UUID=96b5fd56-93ab-4512-a2da-c89f56a73da3 / ext4 defaults 0 0
+/swap.img	none	swap	sw	0	0
+
+to:
+
+UUID=96b5fd56-93ab-4512-a2da-c89f56a73da3 / ext4 defaults 0 0
+#/swap.img	none	swap	sw	0	0
+
+
+We will then install Kubernetes: collect the certificates, add the signing 
+key to the local apt repository, add the google kubernetes repository... and 
+finally install docker:
+
+# curl -s https://packages.cloud.google.com/apt/doc/apt-key.gpg | apt-key add -
+# add-apt-repository "deb http://apt.kubernetes.io/ kubernetes-xenial main"
+# apt-get update
+# apt-get install -y kubelet kubeadm kubectl
+
+
+Here we are !!!
+The generic VM is setup, and we can use this basis for crafting teh master 
+and slave nodes. As a matter of precaution, you should log out, go in 
+VirtualBox and shutdown the VM (softly), take a snapshot of the VM and export 
+it as and appliance under the name of  "K8s BARE".
+
+
+=========================================
+2.2 - Building the master and slave nodes
+=========================================
+
+In this section, we will configure one master node and two slave nodes 
+from "K8s BARE". To do so, we will clone K8s_BARE (which VirtualBox does very
+easily).
+
+In order to reduce the memory footprint of the tutorial, choose 'linked clone'
+rather than 'full clone', since each VM virtual disk is more than 3.5GB (and
+the laptop does not have infinite storage).
+
+(K8s BARE - 7 - Cloning)
+
+And you should get something looking like this:
+
+(K8s BARE - 8 - Cloned machines)
+
+Start the three VMs in VirtualBox, and as shown in the previous section, 
+log in, identify the ip@, and connect on these VMs from terminals running on 
+the host machine.
+
+Since almost all prerequisites were already installed in the previous phase, 
+the task here merely consists in renaming the machines so that a) you know on
+which machine you are logged, and b) you prevent naming conflicts within the
+kubernetes cluster later on (since every node must have a unique name in the 
+cluster).
+
+So we will edit two files: /etc/hosts and /etc/hostname
+
+Log into the first VM (in our case 'ssh thierry@192.168.0.108) and edit the
+file /etc/hostname: replace the previous host name (k8s-node) with the new
+host name 'k8s-master'.
+
+Then edit the file /etc/hosts and add the new name 'k8s-master after
+'127.0.0.1   localhost'.
+
+After edition, it should look like this:
+
+thierry@k8s-master:~$ cat /etc/hostname 
+k8s-master
+
+thierry@k8s-master:~$ cat /etc/hosts
+127.0.0.1 localhost k8s-master
+127.0.1.1 k8s_node
+
+# The following lines are desirable for IPv6 capable hosts
+::1     ip6-localhost ip6-loopback
+fe00::0 ip6-localnet
+ff00::0 ip6-mcastprefix
+ff02::1 ip6-allnodes
+ff02::2 ip6-allrouters
+
+Then do so on the two other machines (respectively at 192.168.0.109 and 
+192.168.0.110) with the new host names 'k8s-slave1' and 'k8s-slave2'.
+
+That's it! We now have 3 machines running on the laptop, with all the 
+prerequisites installed and the right configuration to make them a master 
+and two slaves.
+
+We can test the connectivity between the machines on the laptop (ping from 
+one machine to the other) to check that there is no problem, and then go to
+the next section.
+
+
+=====================================
+2.2 - Configure and start the cluster
+=====================================
 
 
 
-From the master:
+
+
+
+        From the master:
 As root:
 
 Create the cluster: (taking into account teh actual ip@ of the master node
