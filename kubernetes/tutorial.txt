@@ -9,8 +9,8 @@
 
 
 This tutorial mixes elements from the official Kubernetes site 'get started' 
-section, and also from Dada's blog (specifically for setting up the 
-Kubernetes clusters on VMs running on a laptop):
+sections (many of these), and also from Dada's blog (specifically for setting 
+up the Kubernetes clusters on VMs running on a laptop):
     https://kubernetes.io/docs/tutorials/kubernetes-basics/
     https://www.dadall.info/article658/preparer-virtualbox-pour-kubernetes
 
@@ -22,6 +22,7 @@ learn something from this experience:
     - have curl, git and virtualbox installed
 
 Also, you will find several resources in the directory:
+
     - flannel.yml - a kubernetes network model
     - server.js   - a node.js example application used as of part 3
     - Dockerfile  - to build the container for the application
@@ -78,8 +79,8 @@ with best-of-breed ideas from the community.
 ======================================
 
 
-Scope
-=====
+1.3.1 Scope
+===========
 
 Kubernetes is a platform for deploying and managing containers. Kubernetes 
 provides a container runtime, container orchestration, container-centric 
@@ -104,8 +105,8 @@ no glass to break -- in order to handle more complex use cases, one can just
 access the lower-level APIs in a fully transparent, composable manner.
 
 
-Goals
-=====
+1.3.2 Goals
+===========
 
 The project is committed to the following (aspirational) design ideals:
 
@@ -146,81 +147,186 @@ The project is committed to the following (aspirational) design ideals:
       model.
 
 
-Architecture
-============
+1.3.3 Architecture
+==================
 
-A running Kubernetes cluster contains node agents (kubelet) and a cluster control plane (AKA master), with cluster state backed by a distributed storage system (etcd).
-Cluster control plane (AKA master)
+A running Kubernetes cluster contains node agents (kubelet) and a cluster 
+control plane (AKA master), with cluster state backed by a distributed storage 
+system (etcd).
 
-The Kubernetes control plane is split into a set of components, which can all run on a single master node, or can be replicated in order to support high-availability clusters, or can even be run on Kubernetes itself (AKA self-hosted).
 
-Kubernetes provides a REST API supporting primarily CRUD operations on (mostly) persistent resources, which serve as the hub of its control plane. Kubernetes’s API provides IaaS-like container-centric primitives such as Pods, Services, and Ingress, and also lifecycle APIs to support orchestration (self-healing, scaling, updates, termination) of common types of workloads, such as ReplicaSet (simple fungible/stateless app manager), Deployment (orchestrates updates of stateless apps), Job (batch), CronJob (cron), DaemonSet (cluster services), and StatefulSet (stateful apps). We deliberately decoupled service naming/discovery and load balancing from application implementation, since the latter is diverse and open-ended.
+a) Cluster control plane (AKA master)
+=====================================
 
-Both user clients and components containing asynchronous controllers interact with the same API resources, which serve as coordination points, common intermediate representation, and shared state. Most resources contain metadata, including labels and annotations, fully elaborated desired state (spec), including default values, and observed state (status).
+The Kubernetes control plane is split into a set of components, which can all 
+run on a single master node, or can be replicated in order to support 
+high-availability clusters, or can even be run on Kubernetes itself 
+(AKA self-hosted).
 
-Controllers work continuously to drive the actual state towards the desired state, while reporting back the currently observed state for users and for other controllers.
+Kubernetes provides a REST API supporting primarily CRUD operations on 
+(mostly) persistent resources, which serve as the hub of its control plane. 
+Kubernetes’s API provides IaaS-like container-centric primitives such as Pods, 
+Services, and Ingress, and also lifecycle APIs to support orchestration 
+(self-healing, scaling, updates, termination) of common types of workloads, 
+such as ReplicaSet (simple fungible/stateless app manager), Deployment 
+(orchestrates updates of stateless apps), Job (batch), CronJob (cron), 
+DaemonSet (cluster services), and StatefulSet (stateful apps). We 
+deliberately decoupled service naming/discovery and load balancing from 
+application implementation, since the latter is diverse and open-ended.
 
-While the controllers are level-based (as described here and here) to maximize fault tolerance, they typically watch for changes to relevant resources in order to minimize reaction latency and redundant work. This enables decentralized and decoupled choreography-like coordination without a message bus.
+Both user clients and components containing asynchronous controllers interact 
+with the same API resources, which serve as coordination points, common 
+intermediate representation, and shared state. Most resources contain 
+metadata, including labels and annotations, fully elaborated desired state 
+(spec), including default values, and observed state (status).
+
+Controllers work continuously to drive the actual state towards the desired 
+state, while reporting back the currently observed state for users and for 
+other controllers.
+
+While the controllers are level-based (as described here and here) to 
+maximize fault tolerance, they typically watch for changes to relevant 
+resources in order to minimize reaction latency and redundant work. This 
+enables decentralized and decoupled choreography-like coordination without a 
+message bus.
+
 API Server
+==========
 
-The API server serves up the Kubernetes API. It is intended to be a relatively simple server, with most/all business logic implemented in separate components or in plug-ins. It mainly processes REST operations, validates them, and updates the corresponding objects in etcd (and perhaps eventually other stores). Note that, for a number of reasons, Kubernetes deliberately does not support atomic transactions across multiple resources.
+The API server serves up the Kubernetes API. It is intended to be a relatively 
+simple server, with most/all business logic implemented in separate components 
+or in plug-ins. It mainly processes REST operations, validates them, and 
+updates the corresponding objects in etcd (and perhaps eventually other 
+stores). Note that, for a number of reasons, Kubernetes deliberately does not 
+support atomic transactions across multiple resources.
 
 Kubernetes cannot function without this basic API machinery, which includes:
 
-    REST semantics, watch, durability and consistency guarantees, API versioning, defaulting, and validation
-    Built-in admission-control semantics, synchronous admission-control hooks, and asynchronous resource initialization
-    API registration and discovery
+    - REST semantics, watch, durability and consistency guarantees, API 
+      versioning, defaulting, and validation
+    - Built-in admission-control semantics, synchronous admission-control 
+      hooks, and asynchronous resource initialization
+    - API registration and discovery
 
-Additionally, the API server acts as the gateway to the cluster. By definition, the API server must be accessible by clients from outside the cluster, whereas the nodes, and certainly containers, may not be. Clients authenticate the API server and also use it as a bastion and proxy/tunnel to nodes and pods (and services).
+Additionally, the API server acts as the gateway to the cluster. By 
+definition, the API server must be accessible by clients from outside the 
+cluster, whereas the nodes, and certainly containers, may not be. Clients 
+authenticate the API server and also use it as a bastion and proxy/tunnel to 
+nodes and pods (and services).
+
 Cluster state store
+===================
 
-All persistent cluster state is stored in an instance of etcd. This provides a way to store configuration data reliably. With watch support, coordinating components can be notified very quickly of changes.
+All persistent cluster state is stored in an instance of etcd. This provides 
+a way to store configuration data reliably. With watch support, coordinating 
+components can be notified very quickly of changes.
+
 Controller-Manager Server
+=========================
 
-Most other cluster-level functions are currently performed by a separate process, called the Controller Manager. It performs both lifecycle functions (e.g., namespace creation and lifecycle, event garbage collection, terminated-pod garbage collection, cascading-deletion garbage collection, node garbage collection) and API business logic (e.g., scaling of pods controlled by a ReplicaSet).
+Most other cluster-level functions are currently performed by a separate 
+process, called the Controller Manager. It performs both lifecycle functions 
+(e.g., namespace creation and lifecycle, event garbage collection, 
+terminated-pod garbage collection, cascading-deletion garbage collection, 
+node garbage collection) and API business logic (e.g., scaling of pods 
+controlled by a ReplicaSet).
 
-The application management and composition layer, providing self-healing, scaling, application lifecycle management, service discovery, routing, and service binding and provisioning.
+The application management and composition layer, providing self-healing, 
+scaling, application lifecycle management, service discovery, routing, and 
+service binding and provisioning.
 
-These functions may eventually be split into separate components to make them more easily extended or replaced.
+These functions may eventually be split into separate components to make them 
+more easily extended or replaced.
+
 Scheduler
+=========
 
-Kubernetes enables users to ask a cluster to run a set of containers. The scheduler component automatically chooses hosts to run those containers on.
+Kubernetes enables users to ask a cluster to run a set of containers. The 
+scheduler component automatically chooses hosts to run those containers on.
 
-The scheduler watches for unscheduled pods and binds them to nodes via the /binding pod subresource API, according to the availability of the requested resources, quality of service requirements, affinity and anti-affinity specifications, and other constraints.
+The scheduler watches for unscheduled pods and binds them to nodes via the 
+/binding pod subresource API, according to the availability of the requested 
+resources, quality of service requirements, affinity and anti-affinity 
+specifications, and other constraints.
 
-Kubernetes supports user-provided schedulers and multiple concurrent cluster schedulers, using the shared-state approach pioneered by Omega. In addition to the disadvantages of pessimistic concurrency described by the Omega paper, two-level scheduling models that hide information from the upper-level schedulers need to implement all of the same features in the lower-level scheduler as required by all upper-layer schedulers in order to ensure that their scheduling requests can be satisfied by available desired resources.
-The Kubernetes Node
+Kubernetes supports user-provided schedulers and multiple concurrent cluster 
+schedulers, using the shared-state approach pioneered by Omega. In addition to 
+the disadvantages of pessimistic concurrency described by the Omega paper, 
+two-level scheduling models that hide information from the upper-level 
+schedulers need to implement all of the same features in the lower-level 
+scheduler as required by all upper-layer schedulers in order to ensure that 
+their scheduling requests can be satisfied by available desired resources.
 
-The Kubernetes node has the services necessary to run application containers and be managed from the master systems.
+b) The Kubernetes Node
+======================
+
+The Kubernetes node has the services necessary to run application containers 
+and be managed from the master systems.
+
 Kubelet
+=======
 
-The most important and most prominent controller in Kubernetes is the Kubelet, which is the primary implementer of the Pod and Node APIs that drive the container execution layer. Without these APIs, Kubernetes would just be a CRUD-oriented REST application framework backed by a key-value store (and perhaps the API machinery will eventually be spun out as an independent project).
+The most important and most prominent controller in Kubernetes is the Kubelet,
+which is the primary implementer of the Pod and Node APIs that drive the 
+container execution layer. Without these APIs, Kubernetes would just be a 
+CRUD-oriented REST application framework backed by a key-value store (and 
+perhaps the API machinery will eventually be spun out as an independent 
+project).
 
-Kubernetes executes isolated application containers as its default, native mode of execution, as opposed to processes and traditional operating-system packages. Not only are application containers isolated from each other, but they are also isolated from the hosts on which they execute, which is critical to decoupling management of individual applications from each other and from management of the underlying cluster physical/virtual infrastructure.
+Kubernetes executes isolated application containers as its default, native 
+mode of execution, as opposed to processes and traditional operating-system 
+packages. Not only are application containers isolated from each other, but 
+they are also isolated from the hosts on which they execute, which is critical 
+to decoupling management of individual applications from each other and from 
+management of the underlying cluster physical/virtual infrastructure.
 
-Kubernetes provides Pods that can host multiple containers and storage volumes as its fundamental execution primitive in order to facilitate packaging a single application per container, decoupling deployment-time concerns from build-time concerns, and migration from physical/virtual machines. The Pod primitive is key to glean the primary benefits of deployment on modern cloud platforms, such as Kubernetes.
+Kubernetes provides Pods that can host multiple containers and storage volumes 
+as its fundamental execution primitive in order to facilitate packaging a 
+single application per container, decoupling deployment-time concerns from 
+build-time concerns, and migration from physical/virtual machines. The Pod 
+primitive is key to glean the primary benefits of deployment on modern cloud 
+platforms, such as Kubernetes.
 
-API admission control may reject pods or add additional scheduling constraints to them, but Kubelet is the final arbiter of what pods can and cannot run on a given node, not the schedulers or DaemonSets.
+API admission control may reject pods or add additional scheduling constraints 
+to them, but Kubelet is the final arbiter of what pods can and cannot run on 
+a given node, not the schedulers or DaemonSets.
 
 Kubelet also currently links in the cAdvisor resource monitoring agent.
+
 Container runtime
+=================
 
-Each node runs a container runtime, which is responsible for downloading images and running containers.
+Each node runs a container runtime, which is responsible for downloading 
+images and running containers.
 
-Kubelet does not link in the base container runtime. Instead, we're defining a Container Runtime Interface to control the underlying runtime and facilitate pluggability of that layer. This decoupling is needed in order to maintain clear component boundaries, facilitate testing, and facilitate pluggability. Runtimes supported today, either upstream or by forks, include at least docker (for Linux and Windows), rkt, cri-o, and frakti.
+Kubelet does not link in the base container runtime. Instead, we're defining 
+a Container Runtime Interface to control the underlying runtime and facilitate 
+pluggability of that layer. This decoupling is needed in order to maintain 
+clear component boundaries, facilitate testing, and facilitate pluggability. 
+Runtimes supported today, either upstream or by forks, include at least docker 
+(for Linux and Windows), rkt, cri-o, and frakti.
+
 Kube Proxy
+==========
 
-The service abstraction provides a way to group pods under a common access policy (e.g., load-balanced). The implementation of this creates a virtual IP which clients can access and which is transparently proxied to the pods in a Service. Each node runs a kube-proxy process which programs iptables rules to trap access to service IPs and redirect them to the correct backends. This provides a highly-available load-balancing solution with low performance overhead by balancing client traffic from a node on that same node.
+The service abstraction provides a way to group pods under a common access 
+policy (e.g., load-balanced). The implementation of this creates a virtual 
+IP which clients can access and which is transparently proxied to the pods in 
+a Service. Each node runs a kube-proxy process which programs iptables rules 
+to trap access to service IPs and redirect them to the correct backends. This 
+provides a highly-available load-balancing solution with low performance 
+overhead by balancing client traffic from a node on that same node.
 
 Service endpoints are found primarily via DNS.
+
 Add-ons and other dependencies
+==============================
 
 A number of components, called add-ons typically run on Kubernetes itself:
-
-    DNS
-    Ingress controller
-    Heapster (resource monitoring)
-    Dashboard (GUI)
+    - DNS
+    - Ingress controller
+    - Heapster (resource monitoring)
+    - Dashboard (GUI)
 
 
 
@@ -232,179 +338,11 @@ A number of components, called add-ons typically run on Kubernetes itself:
 ###############################################################################
 
 
-======================================
-2.1 - Concepts - nodes and controllers
-======================================
-
-
-a. Nodes
-
-A node is a worker machine in Kubernetes. A node may be a VM or physical 
-machine (we then speak of a 'bare metal deployment'), depending on the 
-cluster. Each node contains the services necessary to run pods and is managed 
-by the master components. The services on a node include:
-    - the container runtime,
-    - kubelet
-    - kube-proxy.
-
-
-b. Node Status
-
-
-c. Management
-
-
-
-Node Status
-
-A node’s status contains the following information:
-
-    Addresses
-    Conditions
-    Capacity and Allocatable
-    Info
-
-Node status and other details about a node can be displayed using below command:
-
-kubectl describe node <insert-node-name-here>
-
-Each section is described in detail below.
-Addresses
-
-The usage of these fields varies depending on your cloud provider or bare metal configuration.
-
-    HostName: The hostname as reported by the node’s kernel. Can be overridden via the kubelet --hostname-override parameter.
-    ExternalIP: Typically the IP address of the node that is externally routable (available from outside the cluster).
-    InternalIP: Typically the IP address of the node that is routable only within the cluster.
-
-Conditions
-
-The conditions field describes the status of all Running nodes. Examples of conditions include:
-Node Condition	Description
-Ready	True if the node is healthy and ready to accept pods, False if the node is not healthy and is not accepting pods, and Unknown if the node controller has not heard from the node in the last node-monitor-grace-period (default is 40 seconds)
-MemoryPressure	True if pressure exists on the node memory – that is, if the node memory is low; otherwise False
-PIDPressure	True if pressure exists on the processes – that is, if there are too many processes on the node; otherwise False
-DiskPressure	True if pressure exists on the disk size – that is, if the disk capacity is low; otherwise False
-NetworkUnavailable	True if the network for the node is not correctly configured, otherwise False
-
-The node condition is represented as a JSON object. For example, the following response describes a healthy node.
-
-"conditions": [
-  {
-    "type": "Ready",
-    "status": "True",
-    "reason": "KubeletReady",
-    "message": "kubelet is posting ready status",
-    "lastHeartbeatTime": "2019-06-05T18:38:35Z",
-    "lastTransitionTime": "2019-06-05T11:41:27Z"
-  }
-]
-
-If the Status of the Ready condition remains Unknown or False for longer than the pod-eviction-timeout, an argument is passed to the kube-controller-manager and all the Pods on the node are scheduled for deletion by the Node Controller. The default eviction timeout duration is five minutes. In some cases when the node is unreachable, the apiserver is unable to communicate with the kubelet on the node. The decision to delete the pods cannot be communicated to the kubelet until communication with the apiserver is re-established. In the meantime, the pods that are scheduled for deletion may continue to run on the partitioned node.
-
-In versions of Kubernetes prior to 1.5, the node controller would force delete these unreachable pods from the apiserver. However, in 1.5 and higher, the node controller does not force delete pods until it is confirmed that they have stopped running in the cluster. You can see the pods that might be running on an unreachable node as being in the Terminating or Unknown state. In cases where Kubernetes cannot deduce from the underlying infrastructure if a node has permanently left a cluster, the cluster administrator may need to delete the node object by hand. Deleting the node object from Kubernetes causes all the Pod objects running on the node to be deleted from the apiserver, and frees up their names.
-
-In version 1.12, TaintNodesByCondition feature is promoted to beta, so node lifecycle controller automatically creates taints that represent conditions. Similarly the scheduler ignores conditions when considering a Node; instead it looks at the Node’s taints and a Pod’s tolerations.
-
-Now users can choose between the old scheduling model and a new, more flexible scheduling model. A Pod that does not have any tolerations gets scheduled according to the old model. But a Pod that tolerates the taints of a particular Node can be scheduled on that Node.
-
-    Caution: Enabling this feature creates a small delay between the time when a condition is observed and when a taint is created. This delay is usually less than one second, but it can increase the number of Pods that are successfully scheduled but rejected by the kubelet.
-
-Capacity and Allocatable
-
-Describes the resources available on the node: CPU, memory and the maximum number of pods that can be scheduled onto the node.
-
-The fields in the capacity block indicate the total amount of resources that a Node has. The allocatable block indicates the amount of resources on a Node that is available to be consumed by normal Pods.
-
-You may read more about capacity and allocatable resources while learning how to reserve compute resources on a Node.
-Info
-
-Describes general information about the node, such as kernel version, Kubernetes version (kubelet and kube-proxy version), Docker version (if used), and OS name. This information is gathered by Kubelet from the node.
-Management
-
-Unlike pods and services, a node is not inherently created by Kubernetes: it is created externally by cloud providers like Google Compute Engine, or it exists in your pool of physical or virtual machines. So when Kubernetes creates a node, it creates an object that represents the node. After creation, Kubernetes checks whether the node is valid or not. For example, if you try to create a node from the following content:
-
-{
-  "kind": "Node",
-  "apiVersion": "v1",
-  "metadata": {
-    "name": "10.240.79.157",
-    "labels": {
-      "name": "my-first-k8s-node"
-    }
-  }
-}
-
-Kubernetes creates a node object internally (the representation), and validates the node by health checking based on the metadata.name field. If the node is valid – that is, if all necessary services are running – it is eligible to run a pod. Otherwise, it is ignored for any cluster activity until it becomes valid.
-
-    Note: Kubernetes keeps the object for the invalid node and keeps checking to see whether it becomes valid. You must explicitly delete the Node object to stop this process.
-
-Currently, there are three components that interact with the Kubernetes node interface: node controller, kubelet, and kubectl.
-Node Controller
-
-The node controller is a Kubernetes master component which manages various aspects of nodes.
-
-The node controller has multiple roles in a node’s life. The first is assigning a CIDR block to the node when it is registered (if CIDR assignment is turned on).
-
-The second is keeping the node controller’s internal list of nodes up to date with the cloud provider’s list of available machines. When running in a cloud environment, whenever a node is unhealthy, the node controller asks the cloud provider if the VM for that node is still available. If not, the node controller deletes the node from its list of nodes.
-
-The third is monitoring the nodes’ health. The node controller is responsible for updating the NodeReady condition of NodeStatus to ConditionUnknown when a node becomes unreachable (i.e. the node controller stops receiving heartbeats for some reason, e.g. due to the node being down), and then later evicting all the pods from the node (using graceful termination) if the node continues to be unreachable. (The default timeouts are 40s to start reporting ConditionUnknown and 5m after that to start evicting pods.) The node controller checks the state of each node every --node-monitor-period seconds.
-
-In versions of Kubernetes prior to 1.13, NodeStatus is the heartbeat from the node. Node lease feature is enabled by default since 1.14 as a beta feature (feature gate NodeLease, KEP-0009). When node lease feature is enabled, each node has an associated Lease object in kube-node-lease namespace that is renewed by the node periodically, and both NodeStatus and node lease are treated as heartbeats from the node. Node leases are renewed frequently while NodeStatus is reported from node to master only when there is some change or enough time has passed (default is 1 minute, which is longer than the default timeout of 40 seconds for unreachable nodes). Since node lease is much more lightweight than NodeStatus, this feature makes node heartbeat significantly cheaper from both scalability and performance perspectives.
-
-In Kubernetes 1.4, we updated the logic of the node controller to better handle cases when a large number of nodes have problems with reaching the master (e.g. because the master has networking problem). Starting with 1.4, the node controller looks at the state of all nodes in the cluster when making a decision about pod eviction.
-
-In most cases, node controller limits the eviction rate to --node-eviction-rate (default 0.1) per second, meaning it won’t evict pods from more than 1 node per 10 seconds.
-
-The node eviction behavior changes when a node in a given availability zone becomes unhealthy. The node controller checks what percentage of nodes in the zone are unhealthy (NodeReady condition is ConditionUnknown or ConditionFalse) at the same time. If the fraction of unhealthy nodes is at least --unhealthy-zone-threshold (default 0.55) then the eviction rate is reduced: if the cluster is small (i.e. has less than or equal to --large-cluster-size-threshold nodes - default 50) then evictions are stopped, otherwise the eviction rate is reduced to --secondary-node-eviction-rate (default 0.01) per second. The reason these policies are implemented per availability zone is because one availability zone might become partitioned from the master while the others remain connected. If your cluster does not span multiple cloud provider availability zones, then there is only one availability zone (the whole cluster).
-
-A key reason for spreading your nodes across availability zones is so that the workload can be shifted to healthy zones when one entire zone goes down. Therefore, if all nodes in a zone are unhealthy then node controller evicts at the normal rate --node-eviction-rate. The corner case is when all zones are completely unhealthy (i.e. there are no healthy nodes in the cluster). In such case, the node controller assumes that there’s some problem with master connectivity and stops all evictions until some connectivity is restored.
-
-Starting in Kubernetes 1.6, the NodeController is also responsible for evicting pods that are running on nodes with NoExecute taints, when the pods do not tolerate the taints. Additionally, as an alpha feature that is disabled by default, the NodeController is responsible for adding taints corresponding to node problems like node unreachable or not ready. See this documentation for details about NoExecute taints and the alpha feature.
-
-Starting in version 1.8, the node controller can be made responsible for creating taints that represent Node conditions. This is an alpha feature of version 1.8.
-Self-Registration of Nodes
-
-When the kubelet flag --register-node is true (the default), the kubelet will attempt to register itself with the API server. This is the preferred pattern, used by most distros.
-
-For self-registration, the kubelet is started with the following options:
-
-    --kubeconfig - Path to credentials to authenticate itself to the apiserver.
-    --cloud-provider - How to talk to a cloud provider to read metadata about itself.
-    --register-node - Automatically register with the API server.
-    --register-with-taints - Register the node with the given list of taints (comma separated <key>=<value>:<effect>). No-op if register-node is false.
-    --node-ip - IP address of the node.
-    --node-labels - Labels to add when registering the node in the cluster (see label restrictions enforced by the NodeRestriction admission plugin in 1.13+).
-    --node-status-update-frequency - Specifies how often kubelet posts node status to master.
-
-When the Node authorization mode and NodeRestriction admission plugin are enabled, kubelets are only authorized to create/modify their own Node resource.
-Manual Node Administration
-
-A cluster administrator can create and modify node objects.
-
-If the administrator wishes to create node objects manually, set the kubelet flag --register-node=false.
-
-The administrator can modify node resources (regardless of the setting of --register-node). Modifications include setting labels on the node and marking it unschedulable.
-
-Labels on nodes can be used in conjunction with node selectors on pods to control scheduling, e.g. to constrain a pod to only be eligible to run on a subset of the nodes.
-
-Marking a node as unschedulable prevents new pods from being scheduled to that node, but does not affect any existing pods on the node. This is useful as a preparatory step before a node reboot, etc. For example, to mark a node unschedulable, run this command:
-
-kubectl cordon $NODENAME
-
-    Note: Pods created by a DaemonSet controller bypass the Kubernetes scheduler and do not respect the unschedulable attribute on a node. This assumes that daemons belong on the machine even if it is being drained of applications while it prepares for a reboot.
-
-Node capacity
-
-The capacity of the node (number of cpus and amount of memory) is part of the node object. Normally, nodes register themselves and report their capacity when creating the node object. If you are doing manual node administration, then you need to set node capacity when adding a node.
-
-The Kubernetes scheduler ensures that there are enough resources for all the pods on a node. It checks that the sum of the requests of containers on the node is no greater than the node capacity. It includes all containers started by the kubelet, but not containers started directly by the container runtime nor any process running outside of the containers.
-
-If you want to explicitly reserve resources for non-Pod processes, follow this tutorial to reserve resources for system daemons.
-
+Let's now refine a bit few concepts on the node, and get these concepts in 
+action in setting up and deploying a cluster!
 
 ======================================
-2.2 - Naming conventions & unique data
+2.1 - Naming conventions & unique data
 ======================================
 
 
@@ -2590,4 +2528,352 @@ k8s-master   Ready    master   7m33s   v1.16.3
 k8s-slave1   Ready    <none>   2m54s   v1.16.3
 k8s-slave2   Ready    <none>   23s     v1.16.3
 thierry@k8s-master:~$ 
+
+
+
+
+
+
+
+===============================================================================
+===============================================================================
+
+APPENDIX
+
+===============================================================================
+===============================================================================
+
+
+
+
+======================================
+2.1 - Concepts - nodes and controllers
+======================================
+
+
+2.1.1 Nodes
+===========
+
+As seen above, a node is a worker machine in Kubernetes. A node may be a VM or 
+physical machine (we then speak of a 'bare metal deployment'), depending on the 
+cluster. Each node contains the services necessary to run pods and is managed 
+by the master components. The services on a node include:
+    - the container runtime,
+    - kubelet
+    - kube-proxy.
+
+
+a) Node Status
+==============
+
+A node’s status contains the following information:
+    - Addresses
+    - Conditions
+    - Capacity and Allocatable
+    - Info
+
+Node status and other details about a node can be displayed using below 
+command:
+
+$ kubectl describe node <insert-node-name-here>
+
+Addresses
+=========
+
+The usage of these fields varies depending on your cloud provider or bare metal 
+configuration.
+
+    HostName:   The hostname as reported by the node’s kernel. Can be 
+                overridden via the kubelet --hostname-override parameter.
+    ExternalIP: Typically the IP address of the node that is externally 
+                routable (available from outside the cluster).
+    InternalIP: Typically the IP address of the node that is routable only 
+                within the cluster.
+
+Conditions
+==========
+
+The conditions field describes the status of all Running nodes. Examples of 
+conditions include:
+
+Node                Condition
+Ready	            True if the node is healthy and ready to accept pods,
+                    False if the node is not healthy and is not accepting pods, 
+                    Unknown if the node controller has not heard from the node 
+                      in the last node-monitor-grace-period (default is 40 
+                      seconds)
+MemoryPressure	    True if pressure exists on the node memory – that is, if 
+                      the node memory is low; 
+                    False otherwise
+PIDPressure	        True if pressure exists on the processes – that is, if 
+                      there are too many processes on the node; 
+                    False otherwise
+DiskPressure	    True if pressure exists on the disk size – that is, if 
+                      the disk capacity is low; 
+                    False otherwise
+NetworkUnavailable	True if the network for the node is not correctly 
+                      configured, 
+                    False otherwise
+
+The node condition is represented as a JSON object. For example, the following 
+response describes a healthy node.
+
+"conditions": [
+  {
+    "type": "Ready",
+    "status": "True",
+    "reason": "KubeletReady",
+    "message": "kubelet is posting ready status",
+    "lastHeartbeatTime": "2019-06-05T18:38:35Z",
+    "lastTransitionTime": "2019-06-05T11:41:27Z"
+  }
+]
+
+
+If the Status of the Ready condition remains Unknown or False for longer than 
+the pod-eviction-timeout, an argument is passed to the kube-controller-manager 
+and all the Pods on the node are scheduled for deletion by the Node Controller. 
+The default eviction timeout duration is five minutes. In some cases when the 
+node is unreachable, the apiserver is unable to communicate with the kubelet 
+on the node. The decision to delete the pods cannot be communicated to the 
+kubelet until communication with the apiserver is re-established. In the 
+meantime, the pods that are scheduled for deletion may continue to run on the 
+partitioned node.
+
+In versions of Kubernetes prior to 1.5, the node controller would force delete 
+these unreachable pods from the apiserver. However, in 1.5 and higher, the 
+node controller does not force delete pods until it is confirmed that they 
+have stopped running in the cluster. You can see the pods that might be 
+running on an unreachable node as being in the Terminating or Unknown state. 
+In cases where Kubernetes cannot deduce from the underlying infrastructure if 
+a node has permanently left a cluster, the cluster administrator may need to 
+delete the node object by hand. Deleting the node object from Kubernetes 
+causes all the Pod objects running on the node to be deleted from the 
+apiserver, and frees up their names.
+
+In version 1.12, TaintNodesByCondition feature is promoted to beta, so node 
+lifecycle controller automatically creates taints that represent conditions. 
+Similarly the scheduler ignores conditions when considering a Node; instead it 
+looks at the Node’s taints and a Pod’s tolerations.
+
+Now users can choose between the old scheduling model and a new, more flexible 
+scheduling model. A Pod that does not have any tolerations gets scheduled 
+according to the old model. But a Pod that tolerates the taints of a particular 
+Node can be scheduled on that Node.
+
+    Caution: Enabling this feature creates a small delay between the time when 
+      a condition is observed and when a taint is created. This delay is 
+      usually less than one second, but it can increase the number of Pods 
+      that are successfully scheduled but rejected by the kubelet.
+
+Capacity and Allocatable
+========================
+
+Describes the resources available on the node: CPU, memory and the maximum 
+number of pods that can be scheduled onto the node.
+
+The fields in the capacity block indicate the total amount of resources that 
+a Node has. The allocatable block indicates the amount of resources on a Node 
+that is available to be consumed by normal Pods.
+
+You may read more about capacity and allocatable resources while learning how 
+to reserve compute resources on a Node.
+
+Info
+====
+
+Describes general information about the node, such as kernel version, 
+Kubernetes version (kubelet and kube-proxy version), Docker version (if used), 
+and OS name. This information is gathered by Kubelet from the node.
+
+b) Management
+=============
+
+Unlike pods and services, a node is not inherently created by Kubernetes: it 
+is created externally by cloud providers like Google Compute Engine, or it 
+exists in your pool of physical or virtual machines. So when Kubernetes 
+creates a node, it creates an object that represents the node. After creation, 
+Kubernetes checks whether the node is valid or not. For example, if you try to 
+create a node from the following content:
+
+{
+  "kind": "Node",
+  "apiVersion": "v1",
+  "metadata": {
+    "name": "10.240.79.157",
+    "labels": {
+      "name": "my-first-k8s-node"
+    }
+  }
+}
+
+Kubernetes creates a node object internally (the representation), and 
+validates the node by health checking based on the metadata.name field. If 
+the node is valid – that is, if all necessary services are running – it is 
+eligible to run a pod. Otherwise, it is ignored for any cluster activity until 
+it becomes valid.
+
+    Note: Kubernetes keeps the object for the invalid node and keeps checking 
+      to see whether it becomes valid. You must explicitly delete the Node 
+      object to stop this process.
+
+Currently, there are three components that interact with the Kubernetes node 
+interface: node controller, kubelet, and kubectl.
+
+Node Controller
+===============
+
+The node controller is a Kubernetes master component which manages various 
+aspects of nodes.
+
+The node controller has multiple roles in a node’s life.
+
+    - The first is assigning a CIDR block to the node when it is registered (if 
+      CIDR assignment is turned on).
+
+    - The second is keeping the node controller’s internal list of nodes up to 
+      date with the cloud provider’s list of available machines. When running 
+      in a cloud environment, whenever a node is unhealthy, the node controller 
+      asks the cloud provider if the VM for that node is still available. If 
+      not, the node controller deletes the node from its list of nodes.
+
+    - The third is monitoring the nodes’ health. The node controller is 
+      responsible for updating the NodeReady condition of NodeStatus to 
+      ConditionUnknown when a node becomes unreachable (i.e. the node 
+      controller stops receiving heartbeats for some reason, e.g. due to the 
+      node being down), and then later evicting all the pods from the node 
+      (using graceful termination) if the node continues to be unreachable. 
+      (The default timeouts are 40s to start reporting ConditionUnknown and 
+      5m after that to start evicting pods.) The node controller checks the 
+      state of each node every --node-monitor-period seconds.
+
+In versions of Kubernetes prior to 1.13, NodeStatus is the heartbeat from the 
+node. Node lease feature is enabled by default since 1.14 as a beta feature 
+(feature gate NodeLease, KEP-0009). When node lease feature is enabled, each 
+node has an associated Lease object in kube-node-lease namespace that is 
+renewed by the node periodically, and both NodeStatus and node lease are 
+treated as heartbeats from the node. Node leases are renewed frequently while 
+NodeStatus is reported from node to master only when there is some change or 
+enough time has passed (default is 1 minute, which is longer than the default 
+timeout of 40 seconds for unreachable nodes). Since node lease is much more 
+lightweight than NodeStatus, this feature makes node heartbeat significantly 
+cheaper from both scalability and performance perspectives.
+
+In Kubernetes 1.4, we updated the logic of the node controller to better 
+handle cases when a large number of nodes have problems with reaching the 
+master (e.g. because the master has networking problem). Starting with 1.4, 
+the node controller looks at the state of all nodes in the cluster when making 
+a decision about pod eviction.
+
+In most cases, node controller limits the eviction rate to --node-eviction-rate 
+(default 0.1) per second, meaning it won’t evict pods from more than 1 node 
+per 10 seconds.
+
+The node eviction behavior changes when a node in a given availability zone 
+becomes unhealthy. The node controller checks what percentage of nodes in the 
+zone are unhealthy (NodeReady condition is ConditionUnknown or ConditionFalse) 
+at the same time. If the fraction of unhealthy nodes is at least 
+--unhealthy-zone-threshold (default 0.55) then the eviction rate is reduced: 
+if the cluster is small (i.e. has less than or equal to 
+--large-cluster-size-threshold nodes - default 50) then evictions are stopped, 
+otherwise the eviction rate is reduced to --secondary-node-eviction-rate 
+(default 0.01) per second. The reason these policies are implemented per 
+availability zone is because one availability zone might become partitioned 
+from the master while the others remain connected. If your cluster does not 
+span multiple cloud provider availability zones, then there is only one 
+availability zone (the whole cluster).
+
+A key reason for spreading your nodes across availability zones is so that the 
+workload can be shifted to healthy zones when one entire zone goes down. 
+Therefore, if all nodes in a zone are unhealthy then node controller evicts at 
+the normal rate --node-eviction-rate. The corner case is when all zones are 
+completely unhealthy (i.e. there are no healthy nodes in the cluster). In such 
+case, the node controller assumes that there’s some problem with master 
+connectivity and stops all evictions until some connectivity is restored.
+
+Starting in Kubernetes 1.6, the NodeController is also responsible for evicting 
+pods that are running on nodes with NoExecute taints, when the pods do not 
+tolerate the taints. Additionally, as an alpha feature that is disabled by 
+default, the NodeController is responsible for adding taints corresponding 
+to node problems like node unreachable or not ready. See this documentation 
+for details about NoExecute taints and the alpha feature.
+
+Starting in version 1.8, the node controller can be made responsible for 
+creating taints that represent Node conditions. This is an alpha feature of 
+version 1.8.
+
+Self-Registration of Nodes
+==========================
+
+When the kubelet flag --register-node is true (the default), the kubelet will 
+attempt to register itself with the API server. This is the preferred pattern, 
+used by most distros.
+
+For self-registration, the kubelet is started with the following options:
+
+    --kubeconfig - Path to credentials to authenticate itself to the apiserver.
+    --cloud-provider - How to talk to a cloud provider to read metadata about 
+        itself.
+    --register-node - Automatically register with the API server.
+    --register-with-taints - Register the node with the given list of taints 
+        (comma separated <key>=<value>:<effect>). No-op if register-node is 
+        false.
+    --node-ip - IP address of the node.
+    --node-labels - Labels to add when registering the node in the cluster 
+        (see label restrictions enforced by the NodeRestriction admission 
+        plugin in 1.13+).
+    --node-status-update-frequency - Specifies how often kubelet posts node 
+        status to master.
+
+When the Node authorization mode and NodeRestriction admission plugin are 
+enabled, kubelets are only authorized to create/modify their own Node resource.
+
+
+Manual Node Administration
+==========================
+
+A cluster administrator can create and modify node objects.
+
+If the administrator wishes to create node objects manually, set the kubelet 
+flag --register-node=false.
+
+The administrator can modify node resources (regardless of the setting of 
+--register-node). Modifications include setting labels on the node and marking 
+it unschedulable.
+
+Labels on nodes can be used in conjunction with node selectors on pods to 
+control scheduling, e.g. to constrain a pod to only be eligible to run on a 
+subset of the nodes.
+
+Marking a node as unschedulable prevents new pods from being scheduled to that 
+node, but does not affect any existing pods on the node. This is useful as a 
+preparatory step before a node reboot, etc. For example, to mark a node 
+unschedulable, run this command:
+
+
+kubectl cordon $NODENAME
+========================
+    Note: Pods created by a DaemonSet controller bypass the Kubernetes 
+        scheduler and do not respect the unschedulable attribute on a node. 
+        This assumes that daemons belong on the machine even if it is being 
+        drained of applications while it prepares for a reboot.
+
+
+Node capacity
+=============
+
+The capacity of the node (number of cpus and amount of memory) is part of the 
+node object. Normally, nodes register themselves and report their capacity 
+when creating the node object. If you are doing manual node administration, 
+then you need to set node capacity when adding a node.
+
+The Kubernetes scheduler ensures that there are enough resources for all the 
+pods on a node. It checks that the sum of the requests of containers on the 
+node is no greater than the node capacity. It includes all containers started 
+by the kubelet, but not containers started directly by the container runtime 
+nor any process running outside of the containers.
+
+If you want to explicitly reserve resources for non-Pod processes, follow this 
+tutorial to reserve resources for system daemons.
+
 
