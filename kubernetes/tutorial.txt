@@ -2194,354 +2194,9 @@ You will need to delete the persistent storage media for the PersistentVolumes u
 
 
 
-==============================================================================
-==============================================================================
-Ingress
-==============================================================================
-==============================================================================
 
 
-An API object that manages external access to the services in a cluster, 
-typically HTTP.
 
-Ingress can provide load balancing, SSL termination and name-based virtual 
-hosting.
-
-    Terminology
-    What is Ingress?
-    Prerequisites
-    The Ingress Resource
-    Types of Ingress
-    Updating an Ingress
-    Failing across availability zones
-    Future Work
-    Alternatives
-    What's next
-
-Terminology
-
-For clarity, this guide defines the following terms:
-
-Node
-    A worker machine in Kubernetes, part of a cluster.
-Cluster
-    A set of Nodes that run containerized applications managed by Kubernetes. For this example, and in most common Kubernetes deployments, nodes in the cluster are not part of the public internet.
-Edge router
-    A router that enforces the firewall policy for your cluster. This could be a gateway managed by a cloud provider or a physical piece of hardware.
-Cluster network
-    A set of links, logical or physical, that facilitate communication within a cluster according to the Kubernetes networking model.
-Service
-    A Kubernetes Service that identifies a set of Pods using label selectors. Unless mentioned otherwise, Services are assumed to have virtual IPs only routable within the cluster network.
-
-What is Ingress?
-
-Ingress exposes HTTP and HTTPS routes from outside the cluster to services within the cluster. Traffic routing is controlled by rules defined on the Ingress resource.
-
-    internet
-        |
-   [ Ingress ]
-   --|-----|--
-   [ Services ]
-
-An Ingress can be configured to give Services externally-reachable URLs, load balance traffic, terminate SSL / TLS, and offer name based virtual hosting. An Ingress controller is responsible for fulfilling the Ingress, usually with a load balancer, though it may also configure your edge router or additional frontends to help handle the traffic.
-
-An Ingress does not expose arbitrary ports or protocols. Exposing services other than HTTP and HTTPS to the internet typically uses a service of type Service.Type=NodePort or Service.Type=LoadBalancer.
-Prerequisites
-
-You must have an ingress controller to satisfy an Ingress. Only creating an Ingress resource has no effect.
-
-You may need to deploy an Ingress controller such as ingress-nginx. You can choose from a number of Ingress controllers.
-
-Ideally, all Ingress controllers should fit the reference specification. In reality, the various Ingress controllers operate slightly differently.
-
-    Note: Make sure you review your Ingress controller’s documentation to understand the caveats of choosing it.
-
-The Ingress Resource
-
-A minimal Ingress resource example:
-
-apiVersion: networking.k8s.io/v1beta1
-kind: Ingress
-metadata:
-  name: test-ingress
-  annotations:
-    nginx.ingress.kubernetes.io/rewrite-target: /
-spec:
-  rules:
-  - http:
-      paths:
-      - path: /testpath
-        backend:
-          serviceName: test
-          servicePort: 80
-
-As with all other Kubernetes resources, an Ingress needs apiVersion, kind, and metadata fields. For general information about working with config files, see deploying applications, configuring containers, managing resources. Ingress frequently uses annotations to configure some options depending on the Ingress controller, an example of which is the rewrite-target annotation. Different Ingress controller support different annotations. Review the documentation for your choice of Ingress controller to learn which annotations are supported.
-
-The Ingress spec has all the information needed to configure a load balancer or proxy server. Most importantly, it contains a list of rules matched against all incoming requests. Ingress resource only supports rules for directing HTTP traffic.
-Ingress rules
-
-Each HTTP rule contains the following information:
-
-    An optional host. In this example, no host is specified, so the rule applies to all inbound HTTP traffic through the IP address specified. If a host is provided (for example, foo.bar.com), the rules apply to that host.
-    A list of paths (for example, /testpath), each of which has an associated backend defined with a serviceName and servicePort. Both the host and path must match the content of an incoming request before the load balancer directs traffic to the referenced Service.
-    A backend is a combination of Service and port names as described in the Service doc. HTTP (and HTTPS) requests to the Ingress that matches the host and path of the rule are sent to the listed backend.
-
-A default backend is often configured in an Ingress controller to service any requests that do not match a path in the spec.
-Default Backend
-
-An Ingress with no rules sends all traffic to a single default backend. The default backend is typically a configuration option of the Ingress controller and is not specified in your Ingress resources.
-
-If none of the hosts or paths match the HTTP request in the Ingress objects, the traffic is routed to your default backend.
-Types of Ingress
-Single Service Ingress
-
-There are existing Kubernetes concepts that allow you to expose a single Service (see alternatives). You can also do this with an Ingress by specifying a default backend with no rules.
-service/networking/ingress.yaml [Copy service/networking/ingress.yaml to clipboard]
-
-apiVersion: networking.k8s.io/v1beta1
-kind: Ingress
-metadata:
-  name: test-ingress
-spec:
-  backend:
-    serviceName: testsvc
-    servicePort: 80
-
-If you create it using kubectl apply -f you should be able to view the state of the Ingress you just added:
-
-kubectl get ingress test-ingress
-
-NAME           HOSTS     ADDRESS           PORTS     AGE
-test-ingress   *         107.178.254.228   80        59s
-
-Where 107.178.254.228 is the IP allocated by the Ingress controller to satisfy this Ingress.
-
-    Note: Ingress controllers and load balancers may take a minute or two to allocate an IP address. Until that time, you often see the address listed as <pending>.
-
-Simple fanout
-
-A fanout configuration routes traffic from a single IP address to more than one Service, based on the HTTP URI being requested. An Ingress allows you to keep the number of load balancers down to a minimum. For example, a setup like:
-
-foo.bar.com -> 178.91.123.132 -> / foo    service1:4200
-                                 / bar    service2:8080
-
-would require an Ingress such as:
-
-apiVersion: networking.k8s.io/v1beta1
-kind: Ingress
-metadata:
-  name: simple-fanout-example
-  annotations:
-    nginx.ingress.kubernetes.io/rewrite-target: /
-spec:
-  rules:
-  - host: foo.bar.com
-    http:
-      paths:
-      - path: /foo
-        backend:
-          serviceName: service1
-          servicePort: 4200
-      - path: /bar
-        backend:
-          serviceName: service2
-          servicePort: 8080
-
-When you create the Ingress with kubectl apply -f:
-
-kubectl describe ingress simple-fanout-example
-
-Name:             simple-fanout-example
-Namespace:        default
-Address:          178.91.123.132
-Default backend:  default-http-backend:80 (10.8.2.3:8080)
-Rules:
-  Host         Path  Backends
-  ----         ----  --------
-  foo.bar.com
-               /foo   service1:4200 (10.8.0.90:4200)
-               /bar   service2:8080 (10.8.0.91:8080)
-Annotations:
-  nginx.ingress.kubernetes.io/rewrite-target:  /
-Events:
-  Type     Reason  Age                From                     Message
-  ----     ------  ----               ----                     -------
-  Normal   ADD     22s                loadbalancer-controller  default/test
-
-The Ingress controller provisions an implementation-specific load balancer that satisfies the Ingress, as long as the Services (service1, service2) exist. When it has done so, you can see the address of the load balancer at the Address field.
-
-    Note: Depending on the Ingress controller you are using, you may need to create a default-http-backend Service.
-
-Name based virtual hosting
-
-Name-based virtual hosts support routing HTTP traffic to multiple host names at the same IP address.
-
-foo.bar.com --|                 |-> foo.bar.com service1:80
-              | 178.91.123.132  |
-bar.foo.com --|                 |-> bar.foo.com service2:80
-
-The following Ingress tells the backing load balancer to route requests based on the Host header.
-
-apiVersion: networking.k8s.io/v1beta1
-kind: Ingress
-metadata:
-  name: name-virtual-host-ingress
-spec:
-  rules:
-  - host: foo.bar.com
-    http:
-      paths:
-      - backend:
-          serviceName: service1
-          servicePort: 80
-  - host: bar.foo.com
-    http:
-      paths:
-      - backend:
-          serviceName: service2
-          servicePort: 80
-
-If you create an Ingress resource without any hosts defined in the rules, then any web traffic to the IP address of your Ingress controller can be matched without a name based virtual host being required.
-
-For example, the following Ingress resource will route traffic requested for first.bar.com to service1, second.foo.com to service2, and any traffic to the IP address without a hostname defined in request (that is, without a request header being presented) to service3.
-
-apiVersion: networking.k8s.io/v1beta1
-kind: Ingress
-metadata:
-  name: name-virtual-host-ingress
-spec:
-  rules:
-  - host: first.bar.com
-    http:
-      paths:
-      - backend:
-          serviceName: service1
-          servicePort: 80
-  - host: second.foo.com
-    http:
-      paths:
-      - backend:
-          serviceName: service2
-          servicePort: 80
-  - http:
-      paths:
-      - backend:
-          serviceName: service3
-          servicePort: 80
-
-TLS
-
-You can secure an Ingress by specifying a Secret that contains a TLS private key and certificate. Currently the Ingress only supports a single TLS port, 443, and assumes TLS termination. If the TLS configuration section in an Ingress specifies different hosts, they are multiplexed on the same port according to the hostname specified through the SNI TLS extension (provided the Ingress controller supports SNI). The TLS secret must contain keys named tls.crt and tls.key that contain the certificate and private key to use for TLS. For example:
-
-apiVersion: v1
-kind: Secret
-metadata:
-  name: testsecret-tls
-  namespace: default
-data:
-  tls.crt: base64 encoded cert
-  tls.key: base64 encoded key
-type: kubernetes.io/tls
-
-Referencing this secret in an Ingress tells the Ingress controller to secure the channel from the client to the load balancer using TLS. You need to make sure the TLS secret you created came from a certificate that contains a Common Name (CN), also known as a Fully Qualified Domain Name (FQDN) for sslexample.foo.com.
-
-apiVersion: networking.k8s.io/v1beta1
-kind: Ingress
-metadata:
-  name: tls-example-ingress
-spec:
-  tls:
-  - hosts:
-    - sslexample.foo.com
-    secretName: testsecret-tls
-  rules:
-    - host: sslexample.foo.com
-      http:
-        paths:
-        - path: /
-          backend:
-            serviceName: service1
-            servicePort: 80
-
-    Note: There is a gap between TLS features supported by various Ingress controllers. Please refer to documentation on nginx, GCE, or any other platform specific Ingress controller to understand how TLS works in your environment.
-
-Loadbalancing
-
-An Ingress controller is bootstrapped with some load balancing policy settings that it applies to all Ingress, such as the load balancing algorithm, backend weight scheme, and others. More advanced load balancing concepts (e.g. persistent sessions, dynamic weights) are not yet exposed through the Ingress. You can instead get these features through the load balancer used for a Service.
-
-It’s also worth noting that even though health checks are not exposed directly through the Ingress, there exist parallel concepts in Kubernetes such as readiness probes that allow you to achieve the same end result. Please review the controller specific documentation to see how they handle health checks ( nginx, GCE).
-Updating an Ingress
-
-To update an existing Ingress to add a new Host, you can update it by editing the resource:
-
-kubectl describe ingress test
-
-Name:             test
-Namespace:        default
-Address:          178.91.123.132
-Default backend:  default-http-backend:80 (10.8.2.3:8080)
-Rules:
-  Host         Path  Backends
-  ----         ----  --------
-  foo.bar.com
-               /foo   service1:80 (10.8.0.90:80)
-Annotations:
-  nginx.ingress.kubernetes.io/rewrite-target:  /
-Events:
-  Type     Reason  Age                From                     Message
-  ----     ------  ----               ----                     -------
-  Normal   ADD     35s                loadbalancer-controller  default/test
-
-kubectl edit ingress test
-
-This pops up an editor with the existing configuration in YAML format. Modify it to include the new Host:
-
-spec:
-  rules:
-  - host: foo.bar.com
-    http:
-      paths:
-      - backend:
-          serviceName: service1
-          servicePort: 80
-        path: /foo
-  - host: bar.baz.com
-    http:
-      paths:
-      - backend:
-          serviceName: service2
-          servicePort: 80
-        path: /foo
-..
-
-After you save your changes, kubectl updates the resource in the API server, which tells the Ingress controller to reconfigure the load balancer.
-
-Verify this:
-
-kubectl describe ingress test
-
-Name:             test
-Namespace:        default
-Address:          178.91.123.132
-Default backend:  default-http-backend:80 (10.8.2.3:8080)
-Rules:
-  Host         Path  Backends
-  ----         ----  --------
-  foo.bar.com
-               /foo   service1:80 (10.8.0.90:80)
-  bar.baz.com
-               /foo   service2:80 (10.8.0.91:80)
-Annotations:
-  nginx.ingress.kubernetes.io/rewrite-target:  /
-Events:
-  Type     Reason  Age                From                     Message
-  ----     ------  ----               ----                     -------
-  Normal   ADD     45s                loadbalancer-controller  default/test
-
-You can achieve the same outcome by invoking kubectl replace -f on a modified Ingress YAML file.
-Failing across availability zones
-
-Techniques for spreading traffic across failure domains differs between cloud providers. Please check the documentation of the relevant Ingress controller for details. You can also refer to the federation documentation for details on deploying Ingress in a federated cluster.
 
 
 ###############################################################################
@@ -2551,11 +2206,119 @@ Techniques for spreading traffic across failure domains differs between cloud pr
 ###############################################################################
 
 
+Viewing Pods and Nodes
+Objectives
+
+    Learn about Kubernetes Pods.
+    Learn about Kubernetes Nodes.
+    Troubleshoot deployed applications.
+
+Kubernetes Pods
+
+When you created a Deployment in Module 2, Kubernetes created a Pod to host your application instance. A Pod is a Kubernetes abstraction that represents a group of one or more application containers (such as Docker or rkt), and some shared resources for those containers. Those resources include:
+
+    Shared storage, as Volumes
+    Networking, as a unique cluster IP address
+    Information about how to run each container, such as the container image version or specific ports to use
+
+A Pod models an application-specific "logical host" and can contain different application containers which are relatively tightly coupled. For example, a Pod might include both the container with your Node.js app as well as a different container that feeds the data to be published by the Node.js webserver. The containers in a Pod share an IP Address and port space, are always co-located and co-scheduled, and run in a shared context on the same Node.
+
+Pods are the atomic unit on the Kubernetes platform. When we create a Deployment on Kubernetes, that Deployment creates Pods with containers inside them (as opposed to creating containers directly). Each Pod is tied to the Node where it is scheduled, and remains there until termination (according to restart policy) or deletion. In case of a Node failure, identical Pods are scheduled on other available Nodes in the cluster.
+Summary:
+
+    Pods
+    Nodes
+    Kubectl main commands
+
+A Pod is a group of one or more application containers (such as Docker or rkt) and includes shared storage (volumes), IP address and information about how to run them.
+
+Pods overview
+
+
+Nodes
+
+A Pod always runs on a Node. A Node is a worker machine in Kubernetes and may be either a virtual or a physical machine, depending on the cluster. Each Node is managed by the Master. A Node can have multiple pods, and the Kubernetes master automatically handles scheduling the pods across the Nodes in the cluster. The Master's automatic scheduling takes into account the available resources on each Node.
+
+Every Kubernetes Node runs at least:
+
+    Kubelet, a process responsible for communication between the Kubernetes Master and the Node; it manages the Pods and the containers running on a machine.
+    A container runtime (like Docker, rkt) responsible for pulling the container image from a registry, unpacking the container, and running the application.
+
+Containers should only be scheduled together in a single Pod if they are tightly coupled and need to share resources such as disk.
+
+Node overview
+
+
+Troubleshooting with kubectl
+
+In Module 2, you used Kubectl command-line interface. You'll continue to use it in Module 3 to get information about deployed applications and their environments. The most common operations can be done with the following kubectl commands:
+
+    kubectl get - list resources
+    kubectl describe - show detailed information about a resource
+    kubectl logs - print the logs from a container in a pod
+    kubectl exec - execute a command on a container in a pod
+
+You can use these commands to see when applications were deployed, what their current statuses are, where they are running and what their configurations are.
+
+Now that we know more about our cluster components and the command line, let's explore our application.
+
+
+
 ###############################################################################
 #
 # Learn Kubernetes Basics - Part 5 - Expose Your App Publicly
 #
 ###############################################################################
+
+
+Using a Service to Expose Your App
+Objectives
+
+    Learn about a Service in Kubernetes
+    Understand how labels and LabelSelector objects relate to a Service
+    Expose an application outside a Kubernetes cluster using a Service
+
+Overview of Kubernetes Services
+
+Kubernetes Pods are mortal. Pods in fact have a lifecycle. When a worker node dies, the Pods running on the Node are also lost. A ReplicaSet might then dynamically drive the cluster back to desired state via creation of new Pods to keep your application running. As another example, consider an image-processing backend with 3 replicas. Those replicas are exchangeable; the front-end system should not care about backend replicas or even if a Pod is lost and recreated. That said, each Pod in a Kubernetes cluster has a unique IP address, even Pods on the same Node, so there needs to be a way of automatically reconciling changes among Pods so that your applications continue to function.
+
+A Service in Kubernetes is an abstraction which defines a logical set of Pods and a policy by which to access them. Services enable a loose coupling between dependent Pods. A Service is defined using YAML (preferred) or JSON, like all Kubernetes objects. The set of Pods targeted by a Service is usually determined by a LabelSelector (see below for why you might want a Service without including selector in the spec).
+
+Although each Pod has a unique IP address, those IPs are not exposed outside the cluster without a Service. Services allow your applications to receive traffic. Services can be exposed in different ways by specifying a type in the ServiceSpec:
+
+    ClusterIP (default) - Exposes the Service on an internal IP in the cluster. This type makes the Service only reachable from within the cluster.
+    NodePort - Exposes the Service on the same port of each selected Node in the cluster using NAT. Makes a Service accessible from outside the cluster using <NodeIP>:<NodePort>. Superset of ClusterIP.
+    LoadBalancer - Creates an external load balancer in the current cloud (if supported) and assigns a fixed, external IP to the Service. Superset of NodePort.
+    ExternalName - Exposes the Service using an arbitrary name (specified by externalName in the spec) by returning a CNAME record with the name. No proxy is used. This type requires v1.7 or higher of kube-dns.
+
+More information about the different types of Services can be found in the Using Source IP tutorial. Also see Connecting Applications with Services.
+
+Additionally, note that there are some use cases with Services that involve not defining selector in the spec. A Service created without selector will also not create the corresponding Endpoints object. This allows users to manually map a Service to specific endpoints. Another possibility why there may be no selector is you are strictly using type: ExternalName.
+Summary
+
+    Exposing Pods to external traffic
+    Load balancing traffic across multiple Pods
+    Using labels
+
+A Kubernetes Service is an abstraction layer which defines a logical set of Pods and enables external traffic exposure, load balancing and service discovery for those Pods.
+
+Services and Labels
+
+A Service routes traffic across a set of Pods. Services are the abstraction that allow pods to die and replicate in Kubernetes without impacting your application. Discovery and routing among dependent Pods (such as the frontend and backend components in an application) is handled by Kubernetes Services.
+
+Services match a set of Pods using labels and selectors, a grouping primitive that allows logical operation on objects in Kubernetes. Labels are key/value pairs attached to objects and can be used in any number of ways:
+
+    Designate objects for development, test, and production
+    Embed version tags
+    Classify an object using tags
+
+You can create a Service at the same time you create a Deployment by using
+--expose in kubectl.
+
+
+Labels can be attached to objects at creation time or later on. They can be modified at any time. Let's expose our application now using a Service and apply some labels.
+
+
 
 
 ###############################################################################
@@ -2564,6 +2327,36 @@ Techniques for spreading traffic across failure domains differs between cloud pr
 #
 ###############################################################################
 
+Running Multiple Instances of Your App
+Objectives
+
+    Scale an app using kubectl.
+
+Scaling an application
+
+In the previous modules we created a Deployment, and then exposed it publicly via a Service. The Deployment created only one Pod for running our application. When traffic increases, we will need to scale the application to keep up with user demand.
+
+Scaling is accomplished by changing the number of replicas in a Deployment
+Summary:
+
+    Scaling a Deployment
+
+You can create from the start a Deployment with multiple instances using the --replicas parameter for the kubectl run command
+
+Scaling overview
+
+Previous
+Next
+
+Scaling out a Deployment will ensure new Pods are created and scheduled to Nodes with available resources. Scaling will increase the number of Pods to the new desired state. Kubernetes also supports autoscaling of Pods, but it is outside of the scope of this tutorial. Scaling to zero is also possible, and it will terminate all Pods of the specified Deployment.
+
+Running multiple instances of an application will require a way to distribute the traffic to all of them. Services have an integrated load-balancer that will distribute network traffic to all Pods of an exposed Deployment. Services will monitor continuously the running Pods using endpoints, to ensure the traffic is sent only to available Pods.
+
+Scaling is accomplished by changing the number of replicas in a Deployment.
+
+Once you have multiple instances of an Application running, you would be able to do Rolling updates without downtime. We'll cover that in the next module. Now, let's go to the online terminal and scale our application.
+
+
 
 ###############################################################################
 #
@@ -2571,7 +2364,38 @@ Techniques for spreading traffic across failure domains differs between cloud pr
 #
 ###############################################################################
 
+Performing a Rolling Update
+Objectives
 
+    Perform a rolling update using kubectl.
+
+Updating an application
+
+Users expect applications to be available all the time and developers are expected to deploy new versions of them several times a day. In Kubernetes this is done with rolling updates. Rolling updates allow Deployments' update to take place with zero downtime by incrementally updating Pods instances with new ones. The new Pods will be scheduled on Nodes with available resources.
+
+In the previous module we scaled our application to run multiple instances. This is a requirement for performing updates without affecting application availability. By default, the maximum number of Pods that can be unavailable during the update and the maximum number of new Pods that can be created, is one. Both options can be configured to either numbers or percentages (of Pods). In Kubernetes, updates are versioned and any Deployment update can be reverted to previous (stable) version.
+Summary:
+
+    Updating an app
+
+Rolling updates allow Deployments' update to take place with zero downtime by incrementally updating Pods instances with new ones.
+
+Rolling updates overview
+
+Previous
+Next
+
+Similar to application Scaling, if a Deployment is exposed publicly, the Service will load-balance the traffic only to available Pods during the update. An available Pod is an instance that is available to the users of the application.
+
+Rolling updates allow the following actions:
+
+    Promote an application from one environment to another (via container image updates)
+    Rollback to previous versions
+    Continuous Integration and Continuous Delivery of applications with zero downtime
+
+If a Deployment is exposed publicly, the Service will load-balance the traffic only to available Pods during the update.
+
+In the following interactive tutorial, we'll update our application to a new version, and also perform a rollback.
 
 
 
@@ -5265,3 +5089,460 @@ down the number of replicas and rolling out updates are more important than
 controlling exactly which host the Pod runs on. Use a DaemonSet when it is 
 important that a copy of a Pod always run on all or certain hosts, and when it 
 needs to start before other Pods.
+
+
+
+
+==============================================================================
+==============================================================================
+Ingress
+==============================================================================
+==============================================================================
+
+
+An API object that manages external access to the services in a cluster, 
+typically HTTP.
+
+Ingress can provide load balancing, SSL termination and name-based virtual 
+hosting.
+
+
+x.0 - Terminology
+=================
+
+For clarity, this guide defines the following terms:
+
+Node
+    A worker machine in Kubernetes, part of a cluster.
+Cluster
+    A set of Nodes that run containerized applications managed by Kubernetes. 
+    For this example, and in most common Kubernetes deployments, nodes in the 
+    cluster are not part of the public internet.
+Edge router
+    A router that enforces the firewall policy for your cluster. This could be 
+    a gateway managed by a cloud provider or a physical piece of hardware.
+Cluster network
+    A set of links, logical or physical, that facilitate communication within 
+    a cluster according to the Kubernetes networking model.
+Service
+    A Kubernetes Service that identifies a set of Pods using label selectors. 
+    Unless mentioned otherwise, Services are assumed to have virtual IPs only 
+    routable within the cluster network.
+
+
+x.1 - What is Ingress?
+======================
+
+Ingress exposes HTTP and HTTPS routes from outside the cluster to services 
+within the cluster. Traffic routing is controlled by rules defined on the 
+Ingress resource.
+
+    internet
+        |
+   [ Ingress ]
+   --|-----|--
+   [ Services ]
+
+An Ingress can be configured to give Services externally-reachable URLs, load 
+balance traffic, terminate SSL / TLS, and offer name based virtual hosting. An 
+Ingress controller is responsible for fulfilling the Ingress, usually with a 
+load balancer, though it may also configure your edge router or additional 
+frontends to help handle the traffic.
+
+An Ingress does not expose arbitrary ports or protocols. Exposing services 
+other than HTTP and HTTPS to the internet typically uses a service of type 
+Service.Type=NodePort or Service.Type=LoadBalancer.
+
+
+x.2 - Prerequisites
+===================
+
+You must have an ingress controller to satisfy an Ingress. Only creating an 
+Ingress resource has no effect.
+
+You may need to deploy an Ingress controller such as ingress-nginx. You can 
+choose from a number of Ingress controllers.
+
+Ideally, all Ingress controllers should fit the reference specification. In 
+reality, the various Ingress controllers operate slightly differently.
+
+    Note: Make sure you review your Ingress controller’s documentation to 
+        understand the caveats of choosing it.
+
+
+x.3 - The Ingress Resource
+==========================
+
+A minimal Ingress resource example:
+
+apiVersion: networking.k8s.io/v1beta1
+kind: Ingress
+metadata:
+  name: test-ingress
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+spec:
+  rules:
+  - http:
+      paths:
+      - path: /testpath
+        backend:
+          serviceName: test
+          servicePort: 80
+
+As with all other Kubernetes resources, an Ingress needs apiVersion, kind, and 
+metadata fields. For general information about working with config files, see 
+deploying applications, configuring containers, managing resources. Ingress 
+frequently uses annotations to configure some options depending on the Ingress 
+controller, an example of which is the rewrite-target annotation. Different 
+Ingress controller support different annotations. Review the documentation for 
+your choice of Ingress controller to learn which annotations are supported.
+
+The Ingress spec has all the information needed to configure a load balancer or 
+proxy server. Most importantly, it contains a list of rules matched against all 
+incoming requests. Ingress resource only supports rules for directing HTTP 
+traffic.
+
+
+x.4 - Ingress rules
+===================
+
+Each HTTP rule contains the following information:
+
+    - An optional host. In this example, no host is specified, so the rule 
+      applies to all inbound HTTP traffic through the IP address specified. If 
+      a host is provided (for example, foo.bar.com), the rules apply to that 
+      host.
+    - A list of paths (for example, /testpath), each of which has an associated 
+      backend defined with a serviceName and servicePort. Both the host and 
+      path must match the content of an incoming request before the load 
+      balancer directs traffic to the referenced Service.
+    - A backend is a combination of Service and port names as described in the 
+      Service doc. HTTP (and HTTPS) requests to the Ingress that matches the 
+      host and path of the rule are sent to the listed backend.
+
+A default backend is often configured in an Ingress controller to service any 
+requests that do not match a path in the spec.
+
+
+Default Backend
+===============
+
+An Ingress with no rules sends all traffic to a single default backend. The 
+default backend is typically a configuration option of the Ingress controller 
+and is not specified in your Ingress resources.
+
+If none of the hosts or paths match the HTTP request in the Ingress objects, 
+the traffic is routed to your default backend.
+
+
+x.5 - Types of Ingress
+======================
+
+Single Service Ingress
+======================
+
+There are existing Kubernetes concepts that allow you to expose a single 
+Service (see alternatives). You can also do this with an Ingress by specifying 
+a default backend with no rules.
+
+file: service/networking/ingress.yaml
+
+apiVersion: networking.k8s.io/v1beta1
+kind: Ingress
+metadata:
+  name: test-ingress
+spec:
+  backend:
+    serviceName: testsvc
+    servicePort: 80
+
+If you create it using kubectl apply -f you should be able to view the state of 
+the Ingress you just added:
+
+$ kubectl get ingress test-ingress
+NAME           HOSTS     ADDRESS           PORTS     AGE
+test-ingress   *         107.178.254.228   80        59s
+
+Where 107.178.254.228 is the IP allocated by the Ingress controller to satisfy 
+this Ingress.
+
+    Note: Ingress controllers and load balancers may take a minute or two to 
+        allocate an IP address. Until that time, you often see the address 
+        listed as <pending>.
+
+Simple fanout
+=============
+
+A fanout configuration routes traffic from a single IP address to more than one 
+Service, based on the HTTP URI being requested. An Ingress allows you to keep 
+the number of load balancers down to a minimum. For example, a setup like:
+
+foo.bar.com -> 178.91.123.132 -> / foo    service1:4200
+                                 / bar    service2:8080
+
+would require an Ingress such as:
+
+apiVersion: networking.k8s.io/v1beta1
+kind: Ingress
+metadata:
+  name: simple-fanout-example
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+spec:
+  rules:
+  - host: foo.bar.com
+    http:
+      paths:
+      - path: /foo
+        backend:
+          serviceName: service1
+          servicePort: 4200
+      - path: /bar
+        backend:
+          serviceName: service2
+          servicePort: 8080
+
+When you create the Ingress with kubectl apply -f:
+
+$ kubectl describe ingress simple-fanout-example
+Name:             simple-fanout-example
+Namespace:        default
+Address:          178.91.123.132
+Default backend:  default-http-backend:80 (10.8.2.3:8080)
+Rules:
+  Host         Path  Backends
+  ----         ----  --------
+  foo.bar.com
+               /foo   service1:4200 (10.8.0.90:4200)
+               /bar   service2:8080 (10.8.0.91:8080)
+Annotations:
+  nginx.ingress.kubernetes.io/rewrite-target:  /
+Events:
+  Type     Reason  Age                From                     Message
+  ----     ------  ----               ----                     -------
+  Normal   ADD     22s                loadbalancer-controller  default/test
+
+The Ingress controller provisions an implementation-specific load balancer that 
+satisfies the Ingress, as long as the Services (service1, service2) exist. When 
+it has done so, you can see the address of the load balancer at the Address 
+field.
+
+    Note: Depending on the Ingress controller you are using, you may need to 
+        create a default-http-backend Service.
+
+Name based virtual hosting
+==========================
+
+Name-based virtual hosts support routing HTTP traffic to multiple host names at 
+the same IP address.
+
+foo.bar.com --|                 |-> foo.bar.com service1:80
+              | 178.91.123.132  |
+bar.foo.com --|                 |-> bar.foo.com service2:80
+
+The following Ingress tells the backing load balancer to route requests based 
+on the Host header.
+
+apiVersion: networking.k8s.io/v1beta1
+kind: Ingress
+metadata:
+  name: name-virtual-host-ingress
+spec:
+  rules:
+  - host: foo.bar.com
+    http:
+      paths:
+      - backend:
+          serviceName: service1
+          servicePort: 80
+  - host: bar.foo.com
+    http:
+      paths:
+      - backend:
+          serviceName: service2
+          servicePort: 80
+
+If you create an Ingress resource without any hosts defined in the rules, then 
+any web traffic to the IP address of your Ingress controller can be matched 
+without a name based virtual host being required.
+
+For example, the following Ingress resource will route traffic requested for 
+first.bar.com to service1, second.foo.com to service2, and any traffic to the 
+IP address without a hostname defined in request (that is, without a request 
+header being presented) to service3.
+
+apiVersion: networking.k8s.io/v1beta1
+kind: Ingress
+metadata:
+  name: name-virtual-host-ingress
+spec:
+  rules:
+  - host: first.bar.com
+    http:
+      paths:
+      - backend:
+          serviceName: service1
+          servicePort: 80
+  - host: second.foo.com
+    http:
+      paths:
+      - backend:
+          serviceName: service2
+          servicePort: 80
+  - http:
+      paths:
+      - backend:
+          serviceName: service3
+          servicePort: 80
+
+TLS
+===
+
+You can secure an Ingress by specifying a Secret that contains a TLS private 
+key and certificate. Currently the Ingress only supports a single TLS port, 
+443, and assumes TLS termination. If the TLS configuration section in an 
+Ingress specifies different hosts, they are multiplexed on the same port 
+according to the hostname specified through the SNI TLS extension (provided 
+the Ingress controller supports SNI). The TLS secret must contain keys named 
+tls.crt and tls.key that contain the certificate and private key to use for 
+TLS. For example:
+
+apiVersion: v1
+kind: Secret
+metadata:
+  name: testsecret-tls
+  namespace: default
+data:
+  tls.crt: base64 encoded cert
+  tls.key: base64 encoded key
+type: kubernetes.io/tls
+
+Referencing this secret in an Ingress tells the Ingress controller to secure 
+the channel from the client to the load balancer using TLS. You need to make 
+sure the TLS secret you created came from a certificate that contains a Common 
+Name (CN), also known as a Fully Qualified Domain Name (FQDN) for 
+sslexample.foo.com.
+
+apiVersion: networking.k8s.io/v1beta1
+kind: Ingress
+metadata:
+  name: tls-example-ingress
+spec:
+  tls:
+  - hosts:
+    - sslexample.foo.com
+    secretName: testsecret-tls
+  rules:
+    - host: sslexample.foo.com
+      http:
+        paths:
+        - path: /
+          backend:
+            serviceName: service1
+            servicePort: 80
+
+    Note: There is a gap between TLS features supported by various Ingress 
+        controllers. Please refer to documentation on nginx, GCE, or any other 
+        platform specific Ingress controller to understand how TLS works in 
+        your environment.
+
+Loadbalancing
+=============
+
+An Ingress controller is bootstrapped with some load balancing policy settings 
+that it applies to all Ingress, such as the load balancing algorithm, backend 
+weight scheme, and others. More advanced load balancing concepts (e.g. 
+persistent sessions, dynamic weights) are not yet exposed through the Ingress. 
+You can instead get these features through the load balancer used for a 
+Service.
+
+It’s also worth noting that even though health checks are not exposed directly 
+through the Ingress, there exist parallel concepts in Kubernetes such as 
+readiness probes that allow you to achieve the same end result. Please review 
+the controller specific documentation to see how they handle health checks 
+(nginx, GCE).
+
+
+x.6 - Updating an Ingress
+=========================
+
+To update an existing Ingress to add a new Host, you can update it by editing 
+the resource:
+
+$ kubectl describe ingress test
+Name:             test
+Namespace:        default
+Address:          178.91.123.132
+Default backend:  default-http-backend:80 (10.8.2.3:8080)
+Rules:
+  Host         Path  Backends
+  ----         ----  --------
+  foo.bar.com
+               /foo   service1:80 (10.8.0.90:80)
+Annotations:
+  nginx.ingress.kubernetes.io/rewrite-target:  /
+Events:
+  Type     Reason  Age                From                     Message
+  ----     ------  ----               ----                     -------
+  Normal   ADD     35s                loadbalancer-controller  default/test
+
+kubectl edit ingress test
+
+This pops up an editor with the existing configuration in YAML format. Modify 
+it to include the new Host:
+
+spec:
+  rules:
+  - host: foo.bar.com
+    http:
+      paths:
+      - backend:
+          serviceName: service1
+          servicePort: 80
+        path: /foo
+  - host: bar.baz.com
+    http:
+      paths:
+      - backend:
+          serviceName: service2
+          servicePort: 80
+        path: /foo
+..
+
+After you save your changes, kubectl updates the resource in the API server, 
+which tells the Ingress controller to reconfigure the load balancer.
+
+Verify this:
+
+$ kubectl describe ingress test
+Name:             test
+Namespace:        default
+Address:          178.91.123.132
+Default backend:  default-http-backend:80 (10.8.2.3:8080)
+Rules:
+  Host         Path  Backends
+  ----         ----  --------
+  foo.bar.com
+               /foo   service1:80 (10.8.0.90:80)
+  bar.baz.com
+               /foo   service2:80 (10.8.0.91:80)
+Annotations:
+  nginx.ingress.kubernetes.io/rewrite-target:  /
+Events:
+  Type     Reason  Age                From                     Message
+  ----     ------  ----               ----                     -------
+  Normal   ADD     45s                loadbalancer-controller  default/test
+
+You can achieve the same outcome by invoking kubectl replace -f on a modified 
+Ingress YAML file.
+
+
+x.7 - Failing across availability zones
+=======================================
+
+Techniques for spreading traffic across failure domains differs between cloud 
+providers. Please check the documentation of the relevant Ingress controller 
+for details. You can also refer to the federation documentation for details on 
+deploying Ingress in a federated cluster.
+
