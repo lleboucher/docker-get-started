@@ -23,12 +23,15 @@ learn something from this experience:
 
 Also, you will find several resources in the directory:
 
-    - flannel.yml - a kubernetes network model
+    - yaml files  - various configuration files for kubernetes
     - server.js   - a node.js example application used as of part 3
     - Dockerfile  - to build the container for the application
-    - load-balancer-example.yaml - to dsitribute teh app on several pods
     - several VirtualBox VM images in order to build the Kubernetes cluster,
       located in the "VM_images" sub-directory
+
+The document is structured in a main part (the tutorial itself) in this 
+document, and an appendix which gather many useful details as they are 
+explained in the 'Concept' section of the official Kubernetes site.
 
 
 This is it. Nothing else is needed... except the desire to learn :-)
@@ -37,7 +40,7 @@ This is it. Nothing else is needed... except the desire to learn :-)
 
 ###############################################################################
 #
-# Learn Kubernetes Basics - Part 1 - Kubernetes Basics
+# Learn Kubernetes Basics - Part 1 - Kubernetes Concepts
 #
 ###############################################################################
 
@@ -54,19 +57,18 @@ a simple cluster and its containerized applications by yourself.
 Following the tutorial steps, you can learn to:
 
   - Deploy a Kubernetes cluster
-  - Deploy a containerized application on a cluster.
-  - Scale the deployment.
-  - Update the containerized application with a new software version.
-  - Debug the containerized application.
+  - Deploy a simple containerized application on a cluster, scale it, update 
+    it with a new software version, debug it.
+  - Deploy a more complex containerized application with a stateful datastore,
+    and scale/update jointly the application and the data store.
 
 I purposedly copied some reference documentation from the official Kubernetes
-site on design and architecture (section 1.3 + APPENDIX 1) because it is 
-examplary of the philosophy underlying the whole Kubernetes project: clarity of 
-purpose translated in the ability of distributed teams to efficiently 
-contributes into a larger goal, native and forceful openness of the design, 
-resilience-by-design deeply embeded in the implementation of every layer. It 
-is REMARKABLE and should be a source of inspiration in many Orange 
-endeavours...
+site on design and architecture because it is examplary of the philosophy 
+underlying the whole Kubernetes project: clarity of purpose translated in the 
+ability of distributed teams to efficiently contributes into a larger goal, 
+native and forceful openness of the design, resilience-by-design deeply embeded 
+in the implementation of every layer. It is REMARKABLE and should be a source 
+of inspiration in many Orange endeavours...
 
 
 
@@ -521,8 +523,14 @@ The steps are:
       slaves into the cluster (all VMs are then called "cluster deployed")
     - setup a dashboard and access it
 
-You may skip this step and use directly the "cluster deployed" images in order 
-to skip this step and go directly to part 3.
+
+Note: in order to save time, you can jump directly as the section 2.4 and set 
+    up the cluster from VM images which are properly configured. The VM images 
+    are named:
+        2019-12-23 - K8s master - not configured
+        2019-12-23 - K8s slave 1 - not configured
+        2019-12-23 - K8s slave 2 - not configured
+
 
 
 ###
@@ -536,9 +544,9 @@ to skip this step and go directly to part 3.
 ### 1) the ip@ of the VMs
 ###
 ### In the tutorial, I used (copied from a real execution):
-###    master:  192.168.0.63
-###    slave 1: 192.168.0.116
-###    slave 2: 192.168.0.117
+###    master:  192.168.0.118
+###    slave 1: 192.168.0.119
+###    slave 2: 192.168.0.120
 ### The ip@ granted to each VM by the host machine will vary from execution of
 ### this tutorial to another, so please collect the ip@as you will start the 
 ### VMs and keep this information for the whole duration of the tutorial.
@@ -547,13 +555,14 @@ to skip this step and go directly to part 3.
 ###
 ### In the following examples, I used:
 ###
-### $ kubeadm join 192.168.0.63:6443 --token q3nz0g.n2l9ow787j7enj8j --discovery-token-ca-cert-hash sha256:191a8bc561c244591b428dd3a8b82f0b26d34afeed4115626c876c97a6839729
+### $ kubeadm join 192.168.0.118:6443 --token xieq98.t6n7bkdyhqwrsb79 \
+    --discovery-token-ca-cert-hash sha256:6a37ccc0523cf5b060ae80246f06e457bae8298cf9e50f9ea56fbd7d13bad041
 ###
+### YOU WILL NEED TO USE YOUR OWN INFORMATION AS SHOWN IN SECTION 2.4
 ###
-
 
 ===========================
-2.3 - Building the first VM
+2.2 - Building the first VM
 ===========================
 
 (you can skip this phase and use directly the "K8s BARE" image)
@@ -594,16 +603,16 @@ your first loging into the VM from the VM window:
 Open a terminal and - as a regular user on the host machine, ssh into the VM:
 (in my case, the hostname of my laptop is 'laptop' and my login is 'tso')
 
-tso@laptop:~$ ssh thierry@192.168.0.111
+tso@laptop:~$ ssh thierry@192.168.0.118
 
 The first time you connect on a remote machine, you're asked to confirm: 
 confirm by typing 'yes' and then enter the password:
 
-The authenticity of host '192.168.0.111 (192.168.0.111)' can't be established.
+The authenticity of host '192.168.0.118 (192.168.0.118)' can't be established.
 ECDSA key fingerprint is SHA256:blStegSimd9FZS74HYnmTW4CxvNY0gI2LDP7YCcbuzY.
 Are you sure you want to continue connecting (yes/no)? yes
-Warning: Permanently added '192.168.0.111' (ECDSA) to the list of known hosts.
-thierry@192.168.0.111's password: 
+Warning: Permanently added '192.168.0.118' (ECDSA) to the list of known hosts.
+thierry@192.168.0.118's password: 
 
 You are now connected on the VM and your prompt will show it:
 
@@ -673,7 +682,7 @@ it as and appliance under the name of  "K8s BARE".
 
 
 =========================================
-2.4 - Building the master and slave nodes
+2.3 - Building the master and slave nodes
 =========================================
 
 In this section, we will configure one master node and two slave nodes 
@@ -746,7 +755,7 @@ the next section.
 
 
 =====================================
-2.5 - Configure and start the cluster
+2.4 - Configure and start the cluster
 =====================================
 
 To start with, we will initiate the cluster on the master node.
@@ -761,8 +770,8 @@ SSH onto the master node and log as root. To initiate the cluster, we will use
       enable the slave nodes to first connect to the master node.
 
 root@k8s-master:/# kubeadm init --pod-network-cidr=10.244.0.0/16 \
-      --apiserver-advertise-address=192.168.0.63
-
+      --apiserver-advertise-address=192.168.0.118
+      
 The whole setup can take a bit of time, and it shoudl conclude with displaying 
 the following message (truncated):
 
@@ -789,37 +798,69 @@ Run "kubectl apply -f [podnetwork].yaml" with one of the options listed at:
 
 Then you can join any number of worker nodes by running the following on each as root:
 
-kubeadm join 192.168.0.63:6443 --token x4xmhe.jgkyetw64skcjuzu \
-    --discovery-token-ca-cert-hash sha256:93a7075d9d3c2e527ebd05b6bbd13c1b618a00d6585fd46b47d68c22acafa0a3 
+kubeadm join 192.168.0.118:6443 --token xieq98.t6n7bkdyhqwrsb79 \
+    --discovery-token-ca-cert-hash sha256:6a37ccc0523cf5b060ae80246f06e457bae8298cf9e50f9ea56fbd7d13bad041
+
 
 
 Here you are: your Kubernetes master has initialized successfully!
 You can see that the message displayed during the initialisation process 
 includes three very important directives:
-    - you need to create a configuration file to be able to operate the 
-      cluster as a regulaer user (i.e. not root)
+    - you need to create on each machine from which you will manage the cluster 
+      (in our case, on the host and on the master) a .kube directory and 
+      configuration file to be able to operate the cluster as a regular user 
+      (i.e. not root)
     - you need to actually deploy the network which will connect all the pods 
       together, and you will have to choose one of the possible network 
       configurations.
     - you are given the information needed for a slave node to join the 
       cluster by giving the right token and the public key of the master.
 
-So, let's follow these directives:
+So, let's follow these directives.
+
+
+2.4.1 - create the .kube/config file
+====================================
 
 The next step is to configure the 'regular' user (i.e. not root) on the 
-master node who will manage the cluster. First we logout as 'root' but we 
-stay logged as 'thierry' on the master, and as a 'thierry' we enter the 
-commands given in the initialization message:
+master node who will manage the cluster, and on the host machine. First we 
+logout as 'root' but we stay logged as 'thierry' on the master, and as a 
+'thierry' we enter the commands given in the initialization message:
 
 thierry@k8s-master:~$ mkdir -p $HOME/.kube
 thierry@k8s-master:~$ sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
 thierry@k8s-master:~$ sudo chown $(id -u):$(id -g) $HOME/.kube/config
 
-Then we must deploy the network within the cluster. For the sake of 
-simplicity, we will use the 'flannel' network configuration (not because it 
-is better than others, but because I know it is simple to make it work).
 
-thierry@k8s-master:~$ kubectl apply -f https://github.com/coreos/flannel/raw/master/Documentation/kube-flannel.yml
+Now we need to enable the host machine to actually manage the Kubernetes 
+cluster, and in order to do so, we must get back to the host and create the 
+same .kube directory with the same config file (using the same commands as the
+ones we used to create the directory and file on the master node). Log again as 
+'tso' on the laptop, and remote copy this .kube directory from the master to 
+the laptop:
+
+tso@laptop:~$ scp -r thierry@192.168.0.121:~/.kube ~/.kube
+
+Here you are: you now can manage the Kubernetes cluster from the host machine:
+
+tso@laptop:~$ kubectl get nodes
+NAME         STATUS   ROLES    AGE     VERSION
+k8s-master   Ready    master   9m      v1.17.0
+tso@laptop:~$ kubectl get services -o wide
+
+
+2.4.2 - Deploy a Kubernetes network model
+=========================================
+
+We now must deploy the network within the cluster. For the sake of simplicity, 
+we will use the 'flannel' network configuration (not because it is better than 
+others, but because I know it is simple to deploy and make work).
+
+The configuration file for the 'flannel' network can be directly retrieved from
+the kubernetes github repository, and a copy is available in the tutorial yaml 
+files directory.
+
+tso@laptop:~$ kubectl apply -f https://github.com/coreos/flannel/raw/master/Documentation/kube-flannel.yml
 clusterrole.rbac.authorization.k8s.io/flannel created
 clusterrolebinding.rbac.authorization.k8s.io/flannel created
 serviceaccount/flannel created
@@ -831,16 +872,17 @@ daemonset.extensions/kube-flannel-ds-ppc64le created
 daemonset.extensions/kube-flannel-ds-s390x created
 
 Once you have received this message, the master will need a bit of time to 
-process the deployment as it will actually spawn noew pods in charge of 
+process the deployment as it will actually spawn new pods in charge of 
 operating the network. You can see the progress by asking several times to 
 show the pods running on the master with the command:
-$ kubectl get pods --all-namespaces -o wide
+
+tso@laptop:~$ kubectl get pods --all-namespaces -o wide
 
 See the results at several seconds distance, and observe that the pods status
-evolves as their get from 'Pending' to 'ContainerCreating' and finally to 
+evolve as their get from 'Pending' to 'ContainerCreating' and finally to 
 'Running'.
 
-thierry@k8s-master:~$ kubectl get pods --all-namespaces -o wide
+tso@laptop:~$ kubectl get pods --all-namespaces -o wide
 NAMESPACE     NAME                                 READY   STATUS    RESTARTS   AGE     IP          NODE         NOMINATED NODE   READINESS GATES
 kube-system   coredns-6955765f44-pfglx             0/1     Pending   0          2m58s   <none>      <none>       <none>           <none>
 kube-system   coredns-6955765f44-phjl4             0/1     Pending   0          2m58s   <none>      <none>       <none>           <none>
@@ -850,7 +892,7 @@ kube-system   kube-controller-manager-k8s-master   1/1     Running   0          
 kube-system   kube-flannel-ds-amd64-5zvqf          1/1     Running   0          14s     10.0.2.15   k8s-master   <none>           <none>
 kube-system   kube-proxy-w2srw                     1/1     Running   0          2m58s   10.0.2.15   k8s-master   <none>           <none>
 kube-system   kube-scheduler-k8s-master            1/1     Running   0          3m12s   10.0.2.15   k8s-master   <none>           <none>
-thierry@k8s-master:~$ kubectl get pods --all-namespaces -o wide
+tso@laptop:~$ kubectl get pods --all-namespaces -o wide
 NAMESPACE     NAME                                 READY   STATUS              RESTARTS   AGE     IP          NODE         NOMINATED NODE   READINESS GATES
 kube-system   coredns-6955765f44-pfglx             0/1     ContainerCreating   0          3m4s    <none>      k8s-master   <none>           <none>
 kube-system   coredns-6955765f44-phjl4             0/1     ContainerCreating   0          3m4s    <none>      k8s-master   <none>           <none>
@@ -860,7 +902,7 @@ kube-system   kube-controller-manager-k8s-master   1/1     Running             0
 kube-system   kube-flannel-ds-amd64-5zvqf          1/1     Running             0          20s     10.0.2.15   k8s-master   <none>           <none>
 kube-system   kube-proxy-w2srw                     1/1     Running             0          3m4s    10.0.2.15   k8s-master   <none>           <none>
 kube-system   kube-scheduler-k8s-master            1/1     Running             0          3m18s   10.0.2.15   k8s-master   <none>           <none>
-thierry@k8s-master:~$ kubectl get pods --all-namespaces -o wide
+tso@laptop:~$ kubectl get pods --all-namespaces -o wide
 NAMESPACE     NAME                                 READY   STATUS    RESTARTS   AGE     IP           NODE         NOMINATED NODE   READINESS GATES
 kube-system   coredns-6955765f44-pfglx             0/1     Running   0          3m7s    10.244.0.3   k8s-master   <none>           <none>
 kube-system   coredns-6955765f44-phjl4             0/1     Running   0          3m7s    10.244.0.2   k8s-master   <none>           <none>
@@ -870,7 +912,7 @@ kube-system   kube-controller-manager-k8s-master   1/1     Running   0          
 kube-system   kube-flannel-ds-amd64-5zvqf          1/1     Running   0          23s     10.0.2.15    k8s-master   <none>           <none>
 kube-system   kube-proxy-w2srw                     1/1     Running   0          3m7s    10.0.2.15    k8s-master   <none>           <none>
 kube-system   kube-scheduler-k8s-master            1/1     Running   0          3m21s   10.0.2.15    k8s-master   <none>           <none>
-thierry@k8s-master:~$ kubectl get pods --all-namespaces -o wide
+tso@laptop:~$ kubectl get pods --all-namespaces -o wide
 NAMESPACE     NAME                                 READY   STATUS    RESTARTS   AGE     IP           NODE         NOMINATED NODE   READINESS GATES
 kube-system   coredns-6955765f44-pfglx             1/1     Running   0          3m16s   10.244.0.3   k8s-master   <none>           <none>
 kube-system   coredns-6955765f44-phjl4             1/1     Running   0          3m16s   10.244.0.2   k8s-master   <none>           <none>
@@ -895,13 +937,13 @@ DNS... and a controller manager. We will see abit later all these functions.
 
 To check that the cluster is alive, you can run the version command:
 
-thierry@k8s-master:~$ kubectl version
+tso@laptop:~$ kubectl version
 Client Version: version.Info{Major:"1", Minor:"17", GitVersion:"v1.17.0", GitCommit:"70132b0f130acc0bed193d9ba59dd186f0e634cf", GitTreeState:"clean", BuildDate:"2019-12-07T21:20:10Z", GoVersion:"go1.13.4", Compiler:"gc", Platform:"linux/amd64"}
 Server Version: version.Info{Major:"1", Minor:"17", GitVersion:"v1.17.0", GitCommit:"70132b0f130acc0bed193d9ba59dd186f0e634cf", GitTreeState:"clean", BuildDate:"2019-12-07T21:12:17Z", GoVersion:"go1.13.4", Compiler:"gc", Platform:"linux/amd64"}
 
 and view the cluster details:
 
-thierry@k8s-master:~$ kubectl cluster-info
+tso@laptop:~$ kubectl cluster-info
 Kubernetes master is running at https://192.168.0.63:6443
 KubeDNS is running at https://192.168.0.63:6443/api/v1/namespaces/kube-system/services/kube-dns:dns/proxy
 
@@ -909,13 +951,17 @@ Nevertheless, the master is still alone; you have not yet joined a slave into
 the cluster. You can see all the nodes in the cluster with the command
 'kubectl get nodes':
 
-thierry@k8s-master:~$ kubectl get nodes
+tso@laptop:~$ kubectl get nodes
 NAME         STATUS   ROLES    AGE     VERSION
 k8s-master   Ready    master   5m40s   v1.17.0
 
-So it's time to join the two slaves into the cluster. To do so, we need to 
-log into the slave nodes (with ssh), as 'root', and use the token and key 
-which were displayed at the end of the cluster initialisation message:
+
+2.4.3 - Enroll the two slave nodes into the cluster
+===================================================
+
+It's now time to join the two slaves into the cluster. To do so, we need to log 
+into the slave nodes (with ssh), as 'root', and use the token and key which 
+were displayed at the end of the cluster initialisation message:
 
 root@k8s-slave1:/# kubeadm join 192.168.0.63:6443 --token fwt4d1.u6h91bmd5c3uko6e \
     --discovery-token-ca-cert-hash sha256:2e801168b30996a3f2a1dfb2b447a36b359f2522b2f36f9f9983468b4f278b94 
@@ -926,27 +972,27 @@ root@k8s-slave2:/# kubeadm join 192.168.0.63:6443 --token fwt4d1.u6h91bmd5c3uko6
     --discovery-token-ca-cert-hash sha256:2e801168b30996a3f2a1dfb2b447a36b359f2522b2f36f9f9983468b4f278b94 
 
 
-Come back to the master node and check the status of the cluster. Check the 
-number of nodes as they get enlisted and active into the cluster:
+Come back to the laptop and check the status of the cluster. Check the number 
+of nodes as they get enlisted and active into the cluster:
 
-thierry@k8s-master:~$ kubectl get nodes
+tso@laptop:~$ kubectl get nodes
 NAME         STATUS   ROLES    AGE     VERSION
 k8s-master   Ready    master   5m40s   v1.17.0
-thierry@k8s-master:~$ kubectl get nodes
+tso@laptop:~$ kubectl get nodes
 NAME         STATUS     ROLES    AGE     VERSION
 k8s-master   Ready      master   6m46s   v1.17.0
 k8s-slave1   NotReady   <none>   3s      v1.17.0
-thierry@k8s-master:~$ kubectl get nodes
+tso@laptop:~$ kubectl get nodes
 NAME         STATUS     ROLES    AGE     VERSION
 k8s-master   Ready      master   6m49s   v1.17.0
 k8s-slave1   NotReady   <none>   6s      v1.17.0
 k8s-slave2   NotReady   <none>   3s      v1.17.0
-thierry@k8s-master:~$ kubectl get nodes
+tso@laptop:~$ kubectl get nodes
 NAME         STATUS     ROLES    AGE     VERSION
 k8s-master   Ready      master   6m53s   v1.17.0
 k8s-slave1   NotReady   <none>   10s     v1.17.0
 k8s-slave2   NotReady   <none>   7s      v1.17.0
-thierry@k8s-master:~$ kubectl get nodes
+tso@laptop:~$ kubectl get nodes
 NAME         STATUS   ROLES    AGE     VERSION
 k8s-master   Ready    master   7m25s   v1.17.0
 k8s-slave1   Ready    <none>   42s     v1.17.0
@@ -955,7 +1001,7 @@ k8s-slave2   Ready    <none>   39s     v1.17.0
 Now, let's look at the pods running on the cluster: you can see that some 
 pods are now running on the slave nodes as well:
 
-thierry@k8s-master:~$ kubectl get pods --all-namespaces -o wide
+tso@laptop:~$ kubectl get pods --all-namespaces -o wide
 NAMESPACE     NAME                                 READY   STATUS    RESTARTS   AGE     IP           NODE         NOMINATED NODE   READINESS GATES
 kube-system   coredns-6955765f44-pfglx             1/1     Running   0          7m47s   10.244.0.3   k8s-master   <none>           <none>
 kube-system   coredns-6955765f44-phjl4             1/1     Running   0          7m47s   10.244.0.2   k8s-master   <none>           <none>
@@ -971,41 +1017,15 @@ kube-system   kube-proxy-w2srw                     1/1     Running   0          
 kube-system   kube-scheduler-k8s-master            1/1     Running   0          8m1s    10.0.2.15    k8s-master   <none>           <none>
 
 
-YES!!! The cluster is up and running and the master is actually scheduling 
-pods on the slave nodes. At this moment, the pods are only Kubernetes' 
-components, but this is already showing the principles by which Kubernetes
-will schedule your own application on the pods.
+YES!!! The cluster is up and running and the master is actually scheduling pods 
+on the slave nodes. At this moment, the pods are only Kubernetes' components, 
+but this is already showing the principles by which Kubernetes will schedule 
+your own application on the pods.
 
-Now we still to enable the host machine to actually manage the Kubernetes
-cluster, and in order to do so, we must get back to the host and create the 
-same .kube directory with the same config file (using the same commands as the
-ones we used to create the directory and file on the master node):
-
-tso@laptop:~$ mkdir -p $HOME/.kube
-tso@laptop:~$ cd .kube
-tso@laptop:~/.kube$ touch config
-
-Here you must copy the content of the config file on the master and paste it
-without changing anythin in the config file on your host machine. Once it is
-done, continue:
-
-tso@laptop:~/.kube$ cd ..
-tso@laptop:~$ sudo chown $(id -u):$(id -g) $HOME/.kube/config
-
-Here you: you now can manage the Kubernetes cluster from the host machine:
-
-tso@laptop:~$ kubectl get nodes
-NAME         STATUS   ROLES    AGE     VERSION
-k8s-master   Ready    master   16m     v1.17.0
-k8s-slave1   Ready    <none>   10m     v1.17.0
-k8s-slave2   Ready    <none>   9m57s   v1.17.0
-tso@laptop:~$ kubectl get services -o wide
-NAME         TYPE        CLUSTER-IP   EXTERNAL-IP   PORT(S)   AGE   SELECTOR
-kubernetes   ClusterIP   10.96.0.1    <none>        443/TCP   16m   <none>
 
 
 =========================
-2.6 - Setup the dashboard   ---  NOT COMPLETED ---
+2.5 - Setup the dashboard   ---  NOT COMPLETED ---
 =========================
 
 
@@ -1517,14 +1537,14 @@ Vous voici avec une belle interface pour admirer le comportement de votre cluste
 
 ###############################################################################
 #
-# Learn Kubernetes Basics - Part 3 - Deploy an app
+# Learn Kubernetes Basics - Part 3 - Deploy a simple app
 #
 ###############################################################################
 
 
 
 Once you have a running Kubernetes cluster, you can deploy your containerized 
-applications on top of it. To do so, you create a Kubernetes Deployment 
+applications on top of it. To do so, you create a Kubernetes 'Deployment' 
 configuration. The Deployment instructs Kubernetes how to create and update 
 instances of your application. Once you've created a Deployment, the 
 Kubernetes master schedules mentioned application instances onto individual 
@@ -1543,25 +1563,21 @@ Nodes, Kubernetes Deployments provide a fundamentally different approach to
 application management.
 
 
-3.1 - Deploying your first app on Kubernetes
-============================================
+3.1 - Kubernetes Deployments
+============================
 
-Kubernetes Deployments
-======================
-
-Once you have a running Kubernetes cluster, you can deploy your containerized 
-applications on top of it. To do so, you create what is called a "Kubernetes 
-Deployment". The Deployment maerializes through a text file which defines the 
-target state of your application (which application - i.e. which Docker 
-container or which set of containers which compose your application -, on how 
-many nodes - in order to bring resilience - or other criterias your application 
-should respect once it is actually deployed on the cluster). This text file 
-instructs Kubernetes how to create and update instances of your application 
-(actually, it tells the Kubernetes Controller Manager to spawn a Deployment 
-Controller which will read this text file: the Deployment Controller will tell 
-the Kubernetes master how to 'schedules' mentioned application instances onto 
-individual Nodes in the cluster, each node carrying the containers composing 
-your application).
+To deploy your containerized application on top of the cluster, you create what 
+is called a "Kubernetes Deployment". The Deployment maerializes through a text 
+file which defines the target state of your application (which application - 
+i.e. which Docker container or which set of containers which compose your 
+application -, on how many nodes - in order to bring resilience - or other 
+criterias your application should respect once it is actually deployed on the 
+cluster). This text file instructs Kubernetes how to create and update 
+instances of your application (actually, it tells the Kubernetes Controller 
+Manager to spawn a Deployment Controller which will read this text file: the 
+Deployment Controller will tell the Kubernetes master how to 'schedules' 
+mentioned pods onto individual Nodes in the cluster, each pod carrying the 
+containers composing your application).
 
 Once the application instances are created, the Kubernetes Deployment 
 Controller continuously monitors those instances. If the Node hosting an 
@@ -1580,8 +1596,8 @@ Kubernetes Deployments provide a fundamentally different approach to
 application management.
 
 
-Module 2.1 - Deploying your first app on Kubernetes
-======================================
+3.2 - Deploying your first app on Kubernetes
+============================================
 
 You can create and manage a Deployment by using the Kubernetes command line 
 interface, Kubectl. Kubectl uses the Kubernetes API to interact with the 
@@ -1590,14 +1606,17 @@ to create Deployments that run your applications on a Kubernetes cluster.
 
 When you create a Deployment, you'll need to specify the container image for 
 your application and the number of replicas that you want to run. You can 
-change that information later by updating your Deployment; Modules 5 and 6 of 
-this tutorial discuss how you can scale and update your Deployments.
+change that information later by updating your Deployment; sections 3.5 and 3.6 
+of this tutorial discuss how you can scale and update your Deployments.
 
 Applications need to be packaged into one of the supported container formats in 
-order to be deployed on Kubernetes: here we will sue Docker.
+order to be deployed on Kubernetes: here we will use Docker.
 
 For your first Deployment, you'll use a Node.js application packaged in a 
-Docker container. 
+Docker container. The image is provided in the Kubernetes official site
+(https://kubernetes.io/docs/tutorials/hello-minikube/), so we don't have to 
+actually code a new application for our tutorial. The corresponding node.js 
+script and the dockerfile are available in the "hello-world" directory.
 
 
 
