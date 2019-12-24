@@ -1023,516 +1023,12 @@ but this is already showing the principles by which Kubernetes will schedule
 your own application on the pods.
 
 
-
 =========================
-2.5 - Setup the dashboard   ---  NOT COMPLETED ---
+2.5 - Setup the dashboard
 =========================
 
 
-FROM:https://github.com/kubernetes/dashboard/blob/master/README.md
-
-tso@laptop:~$ kubectl apply -f https://raw.githubusercontent.com/kubernetes/dashboard/v1.10.1/src/deploy/recommended/kubernetes-dashboard.yaml
-secret/kubernetes-dashboard-certs created
-serviceaccount/kubernetes-dashboard created
-role.rbac.authorization.k8s.io/kubernetes-dashboard-minimal created
-rolebinding.rbac.authorization.k8s.io/kubernetes-dashboard-minimal created
-deployment.apps/kubernetes-dashboard created
-service/kubernetes-dashboard created
-
-tso@laptop:~$ kubectl get services
-NAME         TYPE        CLUSTER-IP   EXTERNAL-IP   PORT(S)   AGE
-kubernetes   ClusterIP   10.96.0.1    <none>        443/TCP   8m25s
-
-tso@laptop:~$ kubectl get pods -A -o wide
-NAMESPACE     NAME                                    READY   STATUS    RESTARTS   AGE     IP           NODE         NOMINATED NODE   READINESS GATES
-kube-system   coredns-6955765f44-lzwgk                1/1     Running   0          8m10s   10.244.0.2   k8s-master   <none>           <none>
-kube-system   coredns-6955765f44-wxqnn                1/1     Running   0          8m10s   10.244.0.3   k8s-master   <none>           <none>
-kube-system   etcd-k8s-master                         1/1     Running   0          8m22s   10.0.2.15    k8s-master   <none>           <none>
-kube-system   kube-apiserver-k8s-master               1/1     Running   0          8m22s   10.0.2.15    k8s-master   <none>           <none>
-kube-system   kube-controller-manager-k8s-master      1/1     Running   0          8m22s   10.0.2.15    k8s-master   <none>           <none>
-kube-system   kube-proxy-bq9mz                        1/1     Running   0          8m10s   10.0.2.15    k8s-master   <none>           <none>
-kube-system   kube-proxy-rl4lh                        1/1     Running   0          3m47s   10.0.2.15    k8s-slave2   <none>           <none>
-kube-system   kube-proxy-zstqk                        1/1     Running   0          3m57s   10.0.2.15    k8s-slave1   <none>           <none>
-kube-system   kube-scheduler-k8s-master               1/1     Running   0          8m22s   10.0.2.15    k8s-master   <none>           <none>
-kube-system   kubernetes-dashboard-7c54d59f66-h6fk5   1/1     Running   0          59s     10.244.1.2   k8s-slave1   <none>           <none>
-
-On a different terminal:
-
-tso@laptop:~$ kubectl proxy
-Starting to serve on 127.0.0.1:8001
-
-Access the dashboard on the following URL on the browser of the host machine:
-http://localhost:8001/api/v1/namespaces/kube-system/services/https:kubernetes-dashboard:/proxy/
-
-=> Error trying to reach service: 'dial tcp 10.244.1.2:8443: i/o timeout'
-
-
-
-
-
-
-
-
-
-
-
-FROM: https://stackoverflow.com/questions/59006501/how-can-i-remotely-access-kubernetes-dashboard-with-token
-
-
-tso@laptop:~$ kubectl apply -f https://raw.githubusercontent.com/kubernetes/dashboard/v2.0.0-beta6/aio/deploy/recommended.yaml
-namespace/kubernetes-dashboard created
-serviceaccount/kubernetes-dashboard created
-service/kubernetes-dashboard created
-secret/kubernetes-dashboard-certs created
-secret/kubernetes-dashboard-csrf created
-secret/kubernetes-dashboard-key-holder created
-configmap/kubernetes-dashboard-settings created
-role.rbac.authorization.k8s.io/kubernetes-dashboard created
-clusterrole.rbac.authorization.k8s.io/kubernetes-dashboard created
-rolebinding.rbac.authorization.k8s.io/kubernetes-dashboard created
-clusterrolebinding.rbac.authorization.k8s.io/kubernetes-dashboard created
-deployment.apps/kubernetes-dashboard created
-service/dashboard-metrics-scraper created
-deployment.apps/dashboard-metrics-scraper created
-
-
-Start the proxy on a different terminal (or with &):
-
-tso@laptop:~$ kubectl proxy&
-Starting to serve on 127.0.0.1:8001
-
-Create a secret:
-
-tso@laptop:~$ kubectl create serviceaccount tso-admin-dashboard
-serviceaccount/tso-admin-dashboard created
-
-tso@laptop:~$ kubectl create clusterrolebinding dashboard-admin --clusterrole=cluster-admin --serviceaccount=default:tso-admin-dashboard
-clusterrolebinding.rbac.authorization.k8s.io/dashboard-admin created
-
-tso@laptop:~$ kubectl get secret
-NAME                              TYPE                                  DATA   AGE
-default-token-mgdlc               kubernetes.io/service-account-token   3      80m
-tso-admin-dashboard-token-tpg8g   kubernetes.io/service-account-token   3      70s
-
-tso@laptop:~$ kubectl describe secret tso-admin-dashboard
-Name:         tso-admin-dashboard-token-tpg8g
-Namespace:    default
-Labels:       <none>
-Annotations:  kubernetes.io/service-account.name: tso-admin-dashboard
-              kubernetes.io/service-account.uid: bc98e5ad-a40c-4f55-a0cf-5d01d658bbde
-
-Type:  kubernetes.io/service-account-token
-
-Data
-====
-ca.crt:     1025 bytes
-namespace:  7 bytes
-token:      eyJhbGciOiJSUzI1NiIsImtpZCI6IjRubHJqM29NQjFRUDlDM1N2Ykhoa04xU3JmQlVxS1pOV2RtQ1EzcUZyS0kifQ.eyJpc3MiOiJrdWJlcm5ldGVzL3NlcnZpY2VhY2NvdW50Iiwia3ViZXJuZXRlcy5pby9zZXJ2aWNlYWNjb3VudC9uYW1lc3BhY2UiOiJkZWZhdWx0Iiwia3ViZXJuZXRlcy5pby9zZXJ2aWNlYWNjb3VudC9zZWNyZXQubmFtZSI6InRzby1hZG1pbi1kYXNoYm9hcmQtdG9rZW4tdHBnOGciLCJrdWJlcm5ldGVzLmlvL3NlcnZpY2VhY2NvdW50L3NlcnZpY2UtYWNjb3VudC5uYW1lIjoidHNvLWFkbWluLWRhc2hib2FyZCIsImt1YmVybmV0ZXMuaW8vc2VydmljZWFjY291bnQvc2VydmljZS1hY2NvdW50LnVpZCI6ImJjOThlNWFkLWE0MGMtNGY1NS1hMGNmLTVkMDFkNjU4YmJkZSIsInN1YiI6InN5c3RlbTpzZXJ2aWNlYWNjb3VudDpkZWZhdWx0OnRzby1hZG1pbi1kYXNoYm9hcmQifQ.hsx0v4MfkEkAE7GEc1ry3DKuyvT1LEASLaSgbfnISELLxAVxG_9IzJWcOzErgAkff-w4KsinaRONSzdNFxr78IDhVWS-kmRiVVCsQ6cdAZ00u0dpRoQn6l8tFbnAAIA79NFTeBtiSmdOcRyoN8bV-XkwqIsK3tqRQp0SebwxT4SyV2OKiLeGmq_quAML_KfixriMR1tfT_7oasIzezvDk9KepGil0H1xk6GYzKwENvfdsXqyou5Gft50QvQcoBXzlEt9-ga-iJYBKqrmuIfIWgK6gQir08LEkNENPe_z4isit4diMTLMmY9v26qwngDrgP_tQfT-gQuQLxyN8VlKjA
-
-Then establish a tunnel from the host to the master:
-
-tso@laptop:~$ ssh -L 9999:127.0.0.1:8001 -N -f -l thierry 192.168.0.63
-thierry@192.168.0.63's password: 
-
-Once the tunnel is up and running, you should be able to view the dashboard 
-from the browser on hour host machine at the following url:
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-The cluster is running but it is very difficult to see what is actually 
-happening, so it is time to setup the dashboad which visualizes the status 
-of the cluster.
-
-Start with login into the master and launch the installation command for the 
-dashboard:
-
-
-
-
-root@k8s-master:/# kubectl apply -f https://raw.githubusercontent.com/kubernetes/dashboard/v2.0.0-beta8/aio/deploy/head.yaml
-namespace/kubernetes-dashboard-head created
-serviceaccount/kubernetes-dashboard-head created
-service/kubernetes-dashboard-head created
-secret/kubernetes-dashboard-csrf created
-secret/kubernetes-dashboard-key-holder created
-configmap/kubernetes-dashboard-settings created
-role.rbac.authorization.k8s.io/kubernetes-dashboard-head created
-clusterrole.rbac.authorization.k8s.io/kubernetes-dashboard-head created
-rolebinding.rbac.authorization.k8s.io/kubernetes-dashboard-head created
-clusterrolebinding.rbac.authorization.k8s.io/kubernetes-dashboard-head created
-deployment.apps/kubernetes-dashboard-head created
-service/dashboard-metrics-scraper-head created
-deployment.apps/dashboard-metrics-scraper-head created
-
-As you can see, Kubernetes pulls the resources from GitHub and starts pods 
-to run the dashboard application (which is a web server). Check where the 
-pods are running:
-
-tso@laptop:~$ kubectl get pods --all-namespaces -o wide | grep dashb
-kubernetes-dashboard-head   dashboard-metrics-scraper-head-7cc7d9bb4b-9cps7   1/1     Running   0          91s   10.244.1.2   k8s-slave1   <none>           <none>
-kubernetes-dashboard-head   kubernetes-dashboard-head-5c87564c95-6qnkz        1/1     Running   0          91s   10.244.2.2   k8s-slave2   <none>           <none>
-
-The workload is distributed over the two slave nodes. In order to access this
-dasboard, we now need to creae users with teh right roles and authorisations
-(i.e. profiles with the rights in RBAC mode)
-
-Let's now check the services which are running on the cluster:
-
-tso@laptop:~$ kubectl get services -A -o wide
-NAMESPACE                   NAME                             TYPE        CLUSTER-IP      EXTERNAL-IP   PORT(S)                  AGE   SELECTOR
-default                     kubernetes                       ClusterIP   10.96.0.1       <none>        443/TCP                  24m   <none>
-kube-system                 kube-dns                         ClusterIP   10.96.0.10      <none>        53/UDP,53/TCP,9153/TCP   24m   k8s-app=kube-dns
-kubernetes-dashboard-head   dashboard-metrics-scraper-head   ClusterIP   10.96.52.67     <none>        8000/TCP                 56s   k8s-app=dashboard-metrics-scraper-head
-kubernetes-dashboard-head   kubernetes-dashboard-head        ClusterIP   10.96.220.146   <none>        443/TCP                  56s   k8s-app=kubernetes-dashboard-head
-
-You now need to create an admin account for the dashboard and the 
-corresponding role:
-
-Crate a 'admin-user.yaml' file with the following content:
-
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  name: admin-user
-  namespace: kube-system
-
-Then create a 'admin-role.yaml' file with the following content:
-
-apiVersion: rbac.authorization.k8s.io/v1beta1
-kind: ClusterRoleBinding
-metadata:
-  name: admin-user
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
-  kind: ClusterRole
-  name: cluster-admin
-subjects:
-- kind: ServiceAccount
-  name: admin-user
-  namespace: kube-system
-
-And finally load this account and the role into the cluster:
-
-tso@laptop:~$ kubectl apply -f admin-user.yaml
-serviceaccount/admin-user created
-tso@laptop:~$ kubectl apply -f admin-role.yaml
-clusterrolebinding.rbac.authorization.k8s.io/admin-user created
-
-You now want to enable the host machine to connect to the dashboad: in order 
-to do so, you first need to enable the host to 'see' the dashboard service: we
-will achieve this by asking Kubernetes to proxy the dashboard service back to 
-the host. Since the corresponding command will mobilise the terminal, execute 
-it in aonther terminal window:
-
-tso@laptop:~$ kubectl proxy
-Starting to serve on 127.0.0.1:8001
-
-Since recent versions, the access to the dashboard has been more secured, so we need to get some secrets:
-
-
-
-
-
-
-
-thierry@k8s-master:~/.kube$ kubectl -n kube-system describe secret $(kubectl -n kube-system get secret | grep admin-user | awk '{print $1}')
-Name:         admin-user-token-tnh22
-Namespace:    kube-system
-Labels:       <none>
-Annotations:  kubernetes.io/service-account.name: admin-user
-              kubernetes.io/service-account.uid: ab769855-b29a-4cce-8271-edfca5986080
-
-Type:  kubernetes.io/service-account-token
-
-Data
-====
-ca.crt:     1025 bytes
-namespace:  11 bytes
-token:      eyJhbGciOiJSUzI1NiIsImtpZCI6IjRubHJqM29NQjFRUDlDM1N2Ykhoa04xU3JmQlVxS1pOV2RtQ1EzcUZyS0kifQ.eyJpc3MiOiJrdWJlcm5ldGVzL3NlcnZpY2VhY2NvdW50Iiwia3ViZXJuZXRlcy5pby9zZXJ2aWNlYWNjb3VudC9uYW1lc3BhY2UiOiJrdWJlLXN5c3RlbSIsImt1YmVybmV0ZXMuaW8vc2VydmljZWFjY291bnQvc2VjcmV0Lm5hbWUiOiJhZG1pbi11c2VyLXRva2VuLXRuaDIyIiwia3ViZXJuZXRlcy5pby9zZXJ2aWNlYWNjb3VudC9zZXJ2aWNlLWFjY291bnQubmFtZSI6ImFkbWluLXVzZXIiLCJrdWJlcm5ldGVzLmlvL3NlcnZpY2VhY2NvdW50L3NlcnZpY2UtYWNjb3VudC51aWQiOiJhYjc2OTg1NS1iMjlhLTRjY2UtODI3MS1lZGZjYTU5ODYwODAiLCJzdWIiOiJzeXN0ZW06c2VydmljZWFjY291bnQ6a3ViZS1zeXN0ZW06YWRtaW4tdXNlciJ9.Ew1jWNMnuw7jHTwsjsa6pWjW9oKc7vBHXj4ZFvrdVJyZZ_dtTh1HL0QIS9rtY7vEgUs2cIDWWcmF5ZtEWqHr63i8w-T3Ahd1SDdVKhNrt6ujzLsRhJZXlFDu6zpKMtc4QCx_7Q5a4mTiPqKnt1bP20rEWftBHRfbH74gYAzSVHILp7t3Ft_H8Jw5HsPoiM5rgWohOGWZB9mUkC5TWs3zdO8TFR3oYhbiUmmnivcfRVA4oetzhIl6azIkmmjlTUuSXCp9NhzGCVMctAkVHBUNqvacRSQ-Xjs1FiFGJZOXM2rrOyvk_o6AR_lxbHanZ6I1J6_7DXxnh66t7gxZ6ZGm-A
-
-
-
-
-
-
-
-
-tso@laptop:~$ kubectl -n kube-system get secret
-NAME                                             TYPE                                  DATA   AGE
-admin-user-token-tnh22                           kubernetes.io/service-account-token   3      17m
-attachdetach-controller-token-crb7t              kubernetes.io/service-account-token   3      46m
-bootstrap-signer-token-sz769                     kubernetes.io/service-account-token   3      46m
-bootstrap-token-fwt4d1                           bootstrap.kubernetes.io/token         7      46m
-certificate-controller-token-7tf5m               kubernetes.io/service-account-token   3      46m
-clusterrole-aggregation-controller-token-2qwgz   kubernetes.io/service-account-token   3      46m
-coredns-token-mrrdk                              kubernetes.io/service-account-token   3      46m
-cronjob-controller-token-8h6ts                   kubernetes.io/service-account-token   3      46m
-daemon-set-controller-token-rvv6w                kubernetes.io/service-account-token   3      46m
-default-token-f6vz6                              kubernetes.io/service-account-token   3      46m
-deployment-controller-token-bmsrc                kubernetes.io/service-account-token   3      46m
-disruption-controller-token-b5w9w                kubernetes.io/service-account-token   3      46m
-endpoint-controller-token-fs7xj                  kubernetes.io/service-account-token   3      46m
-expand-controller-token-rpqlf                    kubernetes.io/service-account-token   3      46m
-flannel-token-5c6hf                              kubernetes.io/service-account-token   3      43m
-generic-garbage-collector-token-cwnkm            kubernetes.io/service-account-token   3      46m
-horizontal-pod-autoscaler-token-hjpvg            kubernetes.io/service-account-token   3      46m
-job-controller-token-m59nt                       kubernetes.io/service-account-token   3      46m
-kube-proxy-token-d5c6d                           kubernetes.io/service-account-token   3      46m
-namespace-controller-token-9hpbf                 kubernetes.io/service-account-token   3      46m
-node-controller-token-g5snf                      kubernetes.io/service-account-token   3      46m
-persistent-volume-binder-token-dkkbt             kubernetes.io/service-account-token   3      46m
-pod-garbage-collector-token-vzfcg                kubernetes.io/service-account-token   3      46m
-pv-protection-controller-token-8jghj             kubernetes.io/service-account-token   3      46m
-pvc-protection-controller-token-9c8pn            kubernetes.io/service-account-token   3      46m
-replicaset-controller-token-rtbzk                kubernetes.io/service-account-token   3      46m
-replication-controller-token-gww9h               kubernetes.io/service-account-token   3      46m
-resourcequota-controller-token-sncjn             kubernetes.io/service-account-token   3      46m
-service-account-controller-token-8pbfm           kubernetes.io/service-account-token   3      46m
-service-controller-token-dnxxt                   kubernetes.io/service-account-token   3      46m
-statefulset-controller-token-p6tcc               kubernetes.io/service-account-token   3      46m
-token-cleaner-token-s9ddr                        kubernetes.io/service-account-token   3      46m
-ttl-controller-token-tpgtb                       kubernetes.io/service-account-token   3      46m
-
-tso@laptop:~$ kubectl -n kube-system describe secret deployment-controller-token-bmsrc
-Name:         deployment-controller-token-bmsrc
-Namespace:    kube-system
-Labels:       <none>
-Annotations:  kubernetes.io/service-account.name: deployment-controller
-              kubernetes.io/service-account.uid: caafb505-91ab-4d95-922c-51da30181d7d
-
-Type:  kubernetes.io/service-account-token
-
-Data
-====
-namespace:  11 bytes
-token:      eyJhbGciOiJSUzI1NiIsImtpZCI6IjRubHJqM29NQjFRUDlDM1N2Ykhoa04xU3JmQlVxS1pOV2RtQ1EzcUZyS0kifQ.eyJpc3MiOiJrdWJlcm5ldGVzL3NlcnZpY2VhY2NvdW50Iiwia3ViZXJuZXRlcy5pby9zZXJ2aWNlYWNjb3VudC9uYW1lc3BhY2UiOiJrdWJlLXN5c3RlbSIsImt1YmVybmV0ZXMuaW8vc2VydmljZWFjY291bnQvc2VjcmV0Lm5hbWUiOiJkZXBsb3ltZW50LWNvbnRyb2xsZXItdG9rZW4tYm1zcmMiLCJrdWJlcm5ldGVzLmlvL3NlcnZpY2VhY2NvdW50L3NlcnZpY2UtYWNjb3VudC5uYW1lIjoiZGVwbG95bWVudC1jb250cm9sbGVyIiwia3ViZXJuZXRlcy5pby9zZXJ2aWNlYWNjb3VudC9zZXJ2aWNlLWFjY291bnQudWlkIjoiY2FhZmI1MDUtOTFhYi00ZDk1LTkyMmMtNTFkYTMwMTgxZDdkIiwic3ViIjoic3lzdGVtOnNlcnZpY2VhY2NvdW50Omt1YmUtc3lzdGVtOmRlcGxveW1lbnQtY29udHJvbGxlciJ9.ePmuSfi582vSGgE1DUwqp5CacDMLXTNF7MJyqNyJWClTCBKRovMRsBR99SxoYzM1KXk2Doka5cn03ZSfdTXIdQJLUaFOf85-NlGoKA9YcDvq8wFSzb_debqpnuUh75cRPzxKgbi4agM2u3mP6_ZwP4RbUgKe0wlm1oQikVPvfpLjGZea0x6LEsoAJlGzlleclhno02d78AqHql_MqdLAMwfpgNu2iwrVt_domTgaBWwAp5YETe1wqP446QGvNHcQhtcK6wJ3cMMGEy7oP36yB2eayzbS7P4jQUrv9NuK-F9BfhfpyBOAJVw1d7RbUqX54FdHgm1ojvO1HhSRVe7Fxw
-ca.crt:     1025 bytes
-
-
-ALTERNATIVE : get the token in a single command:
-
-tso@laptop:~$ kubectl -n kube-system describe secret $(
-  kubectl -n kube-system get secret | \
-  awk '/^deployment-controller-token-/{print $1}'
-) | \
-awk '$1=="token:"{print $2}'
-eyJhbGciOiJSUzI1NiIsImtpZCI6IjRubHJqM29NQjFRUDlDM1N2Ykhoa04xU3JmQlVxS1pOV2RtQ1EzcUZyS0kifQ.eyJpc3MiOiJrdWJlcm5ldGVzL3NlcnZpY2VhY2NvdW50Iiwia3ViZXJuZXRlcy5pby9zZXJ2aWNlYWNjb3VudC9uYW1lc3BhY2UiOiJrdWJlLXN5c3RlbSIsImt1YmVybmV0ZXMuaW8vc2VydmljZWFjY291bnQvc2VjcmV0Lm5hbWUiOiJkZXBsb3ltZW50LWNvbnRyb2xsZXItdG9rZW4tYm1zcmMiLCJrdWJlcm5ldGVzLmlvL3NlcnZpY2VhY2NvdW50L3NlcnZpY2UtYWNjb3VudC5uYW1lIjoiZGVwbG95bWVudC1jb250cm9sbGVyIiwia3ViZXJuZXRlcy5pby9zZXJ2aWNlYWNjb3VudC9zZXJ2aWNlLWFjY291bnQudWlkIjoiY2FhZmI1MDUtOTFhYi00ZDk1LTkyMmMtNTFkYTMwMTgxZDdkIiwic3ViIjoic3lzdGVtOnNlcnZpY2VhY2NvdW50Omt1YmUtc3lzdGVtOmRlcGxveW1lbnQtY29udHJvbGxlciJ9.ePmuSfi582vSGgE1DUwqp5CacDMLXTNF7MJyqNyJWClTCBKRovMRsBR99SxoYzM1KXk2Doka5cn03ZSfdTXIdQJLUaFOf85-NlGoKA9YcDvq8wFSzb_debqpnuUh75cRPzxKgbi4agM2u3mP6_ZwP4RbUgKe0wlm1oQikVPvfpLjGZea0x6LEsoAJlGzlleclhno02d78AqHql_MqdLAMwfpgNu2iwrVt_domTgaBWwAp5YETe1wqP446QGvNHcQhtcK6wJ3cMMGEy7oP36yB2eayzbS7P4jQUrv9NuK-F9BfhfpyBOAJVw1d7RbUqX54FdHgm1ojvO1HhSRVe7Fxw
-
-We shall use this token when we want to log into the dashboard: you now can 
-access the dashboard from your browser (running on the host) at this url:
-http://127.0.0.1:8001/api/v1/namespaces/kube-system/services/https:kubernetes-dashboard:/proxy/
-Since the welcome page requets a login: choose the 'Token' option and paste 
-the token above into the field.
-
-
-
-
-
-
-Récupérer le token de connexion
-Pour vous connecter au Dashboard, en plus d'avoir le pod et un utilisateur, il vous faut le token qui va bien. Pour le récupérer :
-
-
-Name:         admin-user-token-g4h4m
-Namespace:    kube-system
-Labels:       <none>
-Annotations:  kubernetes.io/service-account.name: admin-user
-              kubernetes.io/service-account.uid: 2124843b-2815-47f5-a558-cb5956bd61d7
-
-Type:  kubernetes.io/service-account-token
-
-Data
-====
-ca.crt:     1025 bytes
-namespace:  11 bytes
-token:      eyJhbGciOiJSUzI1NiIsImtpZCI6IkUyTVprdjJuMGJ1NkVyeFlweFVHd2RtWHR2ZHFDS1JFb21SMDNQNEY3UlUifQ.eyJpc3MiOiJrdWJlcm5ldGVzL3NlcnZpY2VhY2NvdW50Iiwia3ViZXJuZXRlcy5pby9zZXJ2aWNlYWNjb3VudC9uYW1lc3BhY2UiOiJrdWJlLXN5c3RlbSIsImt1YmVybmV0ZXMuaW8vc2VydmljZWFjY291bnQvc2VjcmV0Lm5hbWUiOiJhZG1pbi11c2VyLXRva2VuLWc0aDRtIiwia3ViZXJuZXRlcy5pby9zZXJ2aWNlYWNjb3VudC9zZXJ2aWNlLWFjY291bnQubmFtZSI6ImFkbWluLXVzZXIiLCJrdWJlcm5ldGVzLmlvL3NlcnZpY2VhY2NvdW50L3NlcnZpY2UtYWNjb3VudC51aWQiOiIyMTI0ODQzYi0yODE1LTQ3ZjUtYTU1OC1jYjU5NTZiZDYxZDciLCJzdWIiOiJzeXN0ZW06c2VydmljZWFjY291bnQ6a3ViZS1zeXN0ZW06YWRtaW4tdXNlciJ9.JmnyHQCNRqT90GhMub82keXrhJGi5cOVrKdPoM1Psw6s7qDBRpOobthUVw1KJ5abnFgTnEhVmRW52HcF4dCg2aPcKa5PcFidXtXVdyFXHM2-VUVYDw-97yeVKm9degPES11rs5bcnGGX0Fp7TAN38IhwmDDVcmcR4S7EftnOk1_RkG77Fuauu4mDYDO6kzm9ySrdMP_eF2XsoZr_1JLGucGmMDKaAryRAHPTl11t-i45mE_6NtxGdYo1eukPqKpvKF7-fQz-0Bbg3Pzavoko-nrv1TPZECPAj_cXZk3wptoYzg-Ye_h_dua0ue6CUanE1SY60u0kDmPK8aXGJfZUaw
-
-
-Copy the token (yeah, I know, its long...)
-
-
-Accéder au Dashboard
-Le Dashboard n'est par défaut pas accessible en dehors du cluster. On peut cependant tricher en passant par un proxy et un tunnel SSH.
-Le proxy
-Ouvrez un nouveau terminal branché sur votre master et tapez la commande suivante :
-
-dada@k8smaster:~$ kubectl proxy
-Starting to serve on 127.0.0.1:8001
-
-Le tunnel SSH
-Depuis votre PC hôte, lancez le tunnel :
-
-dada@dada-laptop:~$ ssh -L 8001:127.0.0.1:8001 thierry@192.168.0.63
-
-Affichez le fameux tant attendu
-Si tout s'est bien passé jusqu'ici, vous deviez pouvoir accéder au Dashboard via cette url :
-
-http://192.168.0.108:8001/api/v1/namespaces/kube-system/services/https:kubernetes-dashboard:/proxy/#!/overview?namespace=_all 
-
-=> ça ne marche pas: ce qui s'affiche est un record de failure.
-
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-=============================================================================
-=============================================================================
-NOTES FOR COMPLETING THE DASHBOARD SECTION
-=============================================================================
-=============================================================================
-
- 
-Installing the dashboard:
-
-
-To install the Dashboard, run the following command from the master:
-
-$ kubectl apply -f https://raw.githubusercontent.com/kubernetes/dashboard/master/aio/deploy/recommended/kubernetes-dashboard.yaml
-
-Kubernetes va aller chercher la configuration nécessaire la mise à en place du Dashboard directement depuis son dépôt Github et le faire apparaître dans la liste des pods de votre cluster.
-
-$  kubectl get pods --all-namespaces -o wide | grep dashb
-kube-system   kubernetes-dashboard-77fd78f978-f8p9l   1/1     Running   0          60s     10.244.1.230   k8snode1    <none>
-
-Il est  "Running", ça veut dire qu'il est disponible, mais pas encore accessible.
-Créez un compte utilisateur
-Créez un fichier admin-user.yaml avec ce qui suit dedans :
-
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  name: admin-user
-  namespace: kube-system
-
-Puis créez le rôle qui lui sera attaché : admin-role.yaml
-
-apiVersion: rbac.authorization.k8s.io/v1beta1
-kind: ClusterRoleBinding
-metadata:
-  name: admin-user
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
-  kind: ClusterRole
-  name: cluster-admin
-subjects:
-- kind: ServiceAccount
-  name: admin-user
-  namespace: kube-system
-
-Chargez ces configurations dans le cluster :
-
-kubectl apply -f admin-user.yaml
-kubectl apply -f admin-role.yaml
-
-Récupérer le token de connexion
-Pour vous connecter au Dashboard, en plus d'avoir le pod et un utilisateur, il vous faut le token qui va bien. Pour le récupérer :
-
-dada@k8smaster:~$ kubectl -n kube-system describe secret $(kubectl -n kube-system get secret | grep admin-user | awk '{print $1}')
-Name:         admin-user-token-b8qmq
-Namespace:    kube-system
-Labels:       <none>
-Annotations:  kubernetes.io/service-account.name: admin-user
-              kubernetes.io/service-account.uid: a8a600b1-e010-11e8-96ec-0800273c4560
-
-Type:  kubernetes.io/service-account-token
-
-Data
-====
-ca.crt:     1025 bytes
-namespace:  11 bytes
-token:      eyJhbGciOiJSUzI1NiIsImtpZCI6IiJ9.eyJpc3MiOiJrdWJl.........
-
-J'ai tronqué l'affichage du token. Il est d'une longueur dingue. Copiez-le dans un coin maintenant que vous l'avez.
-Accéder au Dashboard
-Le Dashboard n'est par défaut pas accessible en dehors du cluster. On peut cependant tricher en passant par un proxy et un tunnel SSH.
-Le proxy
-Ouvrez un nouveau terminal branché sur votre master et tapez la commande suivante :
-
-dada@k8smaster:~$ kubectl proxy
-Starting to serve on 127.0.0.1:8001
-
-Le tunnel SSH
-Depuis votre PC hôte, lancez le tunnel :
-
-dada@dada-laptop:~$ ssh -L 8001:127.0.0.1:8001 dada@IP_DU_MASTER
-
-Affichez le fameux tant attendu
-Si tout s'est bien passé jusqu'ici, vous deviez pouvoir accéder au Dashboard via cette url :
-
-http://127.0.0.1:8001/api/v1/namespaces/kube-system/services/https:kubernetes-dashboard:/proxy/#!/overview?namespace=_all
-
-Et voir ceci : 
-
-
-Vous voici avec une belle interface pour admirer le comportement de votre cluster k8s. Foncez cliquer absolument partout et chercher le pourquoi du comment de telles options à tel endroit !
-
-
-
+   ---  TO BE COMPLETED ---
 
 
 ###############################################################################
@@ -1616,24 +1112,14 @@ For your first Deployment, you'll use a Node.js application packaged in a
 Docker container. The image is provided in the Kubernetes official site
 (https://kubernetes.io/docs/tutorials/hello-minikube/), so we don't have to 
 actually code a new application for our tutorial. The corresponding node.js 
-script and the dockerfile are available in the "hello-world" directory.
-
-
-
-===============================================================================
-===============================================================================
-TSO : TO BE CORRECTED 
-(If you didn't already try creating a Node.js application and 
-deploying it using a container, you can do that first by following the 
-instructions from the Hello Minikube tutorial).
-===============================================================================
-===============================================================================
+script and the dockerfile are available in the "hello-world" directory if you
+want to build your local image.
 
 Let’s deploy our first app on Kubernetes with the 'kubectl create deployment'
 command. We need to provide the deployment name and app image location 
 (include the full repository url for images hosted outside Docker hub).
 
-$ kubectl create deployment kubernetes-bootcamp --image=gcr.io/google-samples/kubernetes-bootcamp:v1
+tso@laptop:~$ kubectl create deployment kubernetes-bootcamp --image=gcr.io/google-samples/kubernetes-bootcamp:v1
 
 Great! You just deployed your first application by creating a deployment. This 
 performed a few things for you:
@@ -1654,8 +1140,8 @@ instance is running inside a Docker container on your node.
 
 
 
-Module 2 - Interactive Tutorial - Deploying an App
-==================================================
+3.3 - Deploying an App
+======================
 
 Pods that are running inside Kubernetes are running on a private, isolated 
 network. By default they are visible from other pods and services within the 
@@ -1663,7 +1149,7 @@ same kubernetes cluster, but not outside that network. When we use kubectl,
 we're interacting through an API endpoint to communicate with our application.
 
 We will cover other options on how to expose your application outside the 
-kubernetes cluster in Module 4.
+kubernetes cluster in the later section.
 
 The kubectl command can create a proxy that will forward communications into 
 the cluster-wide, private network. The proxy can be terminated by pressing 
@@ -1716,15 +1202,12 @@ Service is required which will be explained in the next modules.
 
 
 
-###############################################################################
-#
-# Learn Kubernetes Basics - Part 4 - Explore your app
-#
-###############################################################################
+3.4 - Explore your app
+======================
 
 
-4.1 - Kubernetes Pods
-=====================
+3.4.1 - Kubernetes Pods
+=======================
 
 When you created a Deployment in Module 2, Kubernetes created a Pod to host 
 your application instance. A Pod is a Kubernetes abstraction that represents a 
@@ -1754,7 +1237,7 @@ scheduled on other available Nodes in the cluster.
 Pods overview (image "view your app - pod overview")
 
  
-4.2 - Nodes
+3.4.2 - Nodes
 ===========
 
 A Pod always runs on a Node. A Node is a worker machine in Kubernetes and may 
@@ -1778,7 +1261,7 @@ Containers should only be scheduled together in a single Pod if they are tightly
 Node overview (image "view your app - node overview")
 
 
-4.3 - Troubleshooting with kubectl
+3.4.3 - Troubleshooting with kubectl
 ==================================
 
 In Module 2, you used Kubectl command-line interface. You'll continue to use 
@@ -1798,11 +1281,7 @@ are.
 Now that we know more about our cluster components and the command line, let's 
 explore our application.
 
-Module 3 - interactive tutorial - Exploring your app
-====================================================
-
-
-Step 1 Check application configuration
+3.4.4 - Check application configuration
 ======================================
 
 Let’s verify that the application we deployed in the previous scenario is 
@@ -1832,7 +1311,7 @@ of this bootcamp.
         against.
 
 
-Step 2 Show the app in the terminal
+3.4.5 - Show the app in the terminal
 ===================================
 
 Recall that Pods are running in an isolated, private network - so we need to 
@@ -1856,7 +1335,7 @@ $ curl http://localhost:8001/api/v1/namespaces/default/pods/$POD_NAME/proxy/
 The url is the route to the API of the Pod.
 
 
-Step 3 View the container logs
+3.4.6 - View the container logs
 ==============================
 
 Anything that the application would normally send to STDOUT becomes logs for 
@@ -1869,7 +1348,7 @@ Note: We don’t need to specify the container name, because we only have one
 container inside the pod.
 
 
-Step 4 Executing command on the container
+3.4.7 - Executing command on the container
 =========================================
 
 We can execute commands directly on the container once the Pod is up and 
@@ -1904,15 +1383,11 @@ To close your container connection type "exit".
 
 
 
-###############################################################################
-#
-# Learn Kubernetes Basics - Part 5 - Expose Your App Publicly
-#
-###############################################################################
+3.5 - Expose Your App Publicly
+==============================
 
 
-
-5.1 - Overview of Kubernetes Services
+3.5.1 - Overview of Kubernetes Services
 =====================================
 
 Kubernetes Pods are mortal. Pods in fact have a lifecycle. When a worker node 
@@ -1961,7 +1436,7 @@ manually map a Service to specific endpoints. Another possibility why there
 may be no selector is you are strictly using type: ExternalName.
 
 
-5.2 - Services and Labels
+3.5.2 - Services and Labels
 =========================
 
 (image: "expose your app - 1")
@@ -1987,7 +1462,7 @@ modified at any time. Let's expose our application now using a Service and
 apply some labels.
 
 
-Step 1 Create a new service
+3.5.3 - Create a new service
 ===========================
 
 Let’s verify that our application is running. We’ll use the kubectl get 
@@ -2040,7 +1515,7 @@ $ curl $(minikube ip):$NODE_PORT
 And we get a response from the server. The Service is exposed.
 
 
-Step 2: Using labels
+3.5.4 - Using labels
 ====================
 
 The Deployment created automatically a label for our Pod. With describe 
@@ -2080,7 +1555,7 @@ $ kubectl get pods -l app=v1
 And we see the Pod.
 
 
-Step 3 Deleting a service
+3.5.5 - Deleting a service
 =========================
 
 To delete Services you can use the delete service command. Labels can be used 
@@ -2108,14 +1583,11 @@ delete the Deployment as well.
 
 
 
-###############################################################################
-#
-# Learn Kubernetes Basics - Part 6 - Scale Your App
-#
-###############################################################################
+3.6 - Scale Your App
+====================
 
 
-6.1 - Scaling an application
+3.6.1 - Explanation - Scaling an application
 ============================
 
 In the previous modules we created a Deployment, and then exposed it publicly 
@@ -2146,7 +1618,7 @@ to do Rolling updates without downtime. We'll cover that in the next module.
 Now, let's go to the online terminal and scale our application.
 
 
-Step 1: Scaling a deployment
+3.6.2 - Scaling a deployment
 ============================
 
 To list your deployments use the get deployments command:
@@ -2186,7 +1658,7 @@ $ kubectl describe deployments/kubernetes-bootcamp
 You can also view in the output of this command that there are 4 replicas now.
 
 
-Step 2: Load Balancing
+3.6.3 -Load Balancing
 ======================
 
 Let’s check that the Service is load-balancing the traffic. To find out the 
@@ -2210,7 +1682,7 @@ We hit a different Pod with every request. This demonstrates that the
 load-balancing is working.
 
 
-Step 3: Scale Down
+3.6.4 - Scale Down
 ==================
 
 To scale down the Service to 2 replicas, run again the scale command:
@@ -2230,14 +1702,11 @@ This confirms that 2 Pods were terminated.
 
 
 
-###############################################################################
-#
-# Learn Kubernetes Basics - Part 7 - Update Your App
-#
-###############################################################################
+3.7 - Update Your App
+=====================
 
 
-7.1 - Updating an application
+3.7.1 - Updating an application
 =============================
 
 Users expect applications to be available all the time and developers are 
@@ -2255,7 +1724,7 @@ Pods). In Kubernetes, updates are versioned and any Deployment update can be
 reverted to previous (stable) version.
 
 
-7.2 - Rolling updates overview
+3.7.2 - Rolling updates overview
 ==============================
 
 (image: "update your app - 1")
@@ -2277,7 +1746,7 @@ Rolling updates allow the following actions:
         downtime
 
 
-Step 1: Update the version of the app
+3.7.3 - Update the version of the app
 =====================================
 
 To list your deployments use the get deployments command: 
@@ -2305,7 +1774,7 @@ one terminating with the get pods command:
 $ kubectl get pods
 
 
-Step 2: Verify an update
+3.7.4 - Verify an update
 ========================
 
 First, let’s check that the App is running. To find out the exposed IP and 
@@ -2338,7 +1807,7 @@ $ kubectl describe pods
 We run now version 2 of the app (look at the Image field)
 
 
-Step 3: Rollback an update
+3.7.5 - Rollback an update
 ==========================
 
 Let’s perform another update, and deploy image tagged as v10 :
@@ -2378,193 +1847,30 @@ Rollback was successful.
 
 
 
+###############################################################################
+#
+# Learn Kubernetes Basics - Part 4 - Deploy a stateful app
+#
+###############################################################################
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-==============================================================================
-==============================================================================
-==============================================================================
-==============================================================================
-
-More elaborate tuto from the Concept section
-
-
-==============================================================================
-==============================================================================
-==============================================================================
-==============================================================================
-==============================================================================
-
-
-(file: load-balancer-example.yaml)
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  labels:
-    app.kubernetes.io/name: load-balancer-example
-  name: hello-world
-spec:
-  replicas: 5
-  selector:
-    matchLabels:
-      app.kubernetes.io/name: load-balancer-example
-  template:
-    metadata:
-      labels:
-        app.kubernetes.io/name: load-balancer-example
-    spec:
-      containers:
-      - image: gcr.io/google-samples/node-hello:1.0
-        name: hello-world
-        ports:
-        - containerPort: 8080
-
-
-$ kubectl apply -f ./yaml_config/load-balancer-example.yaml
-(ou encore: $ kubectl apply -f https://k8s.io/examples/service/load-balancer-example.yaml)
-
-The preceding command creates a Deployment object and an associated ReplicaSet 
-object. The ReplicaSet has five Pods, each of which runs the Hello World 
-application.
-
-Display information about the Deployment:
-
-$ kubectl get deployments hello-world
-$ kubectl describe deployments hello-world
-
-Display information about your ReplicaSet objects:
-
-$ kubectl get replicasets
-$ kubectl describe replicasets
-
-Create a Service object that exposes the deployment:
-
-$ kubectl expose deployment hello-world --type=LoadBalancer --name=my-service
-
-Display information about the Service:
-
-$ kubectl get services my-service
-NAME         TYPE           CLUSTER-IP     EXTERNAL-IP      PORT(S)    AGE
-my-service   LoadBalancer   10.3.245.137   104.198.205.71   8080/TCP   54s
-
-    Note: If the external IP address is shown as <pending>, wait for a minute and 
-        enter the same command again.
-
-Display detailed information about the Service:
-
-$ kubectl describe services my-service
-Name:           my-service
-Namespace:      default
-Labels:         app.kubernetes.io/name=load-balancer-example
-Annotations:    <none>
-Selector:       app.kubernetes.io/name=load-balancer-example
-Type:           LoadBalancer
-IP:             10.3.245.137
-LoadBalancer Ingress:   104.198.205.71
-Port:           <unset> 8080/TCP
-NodePort:       <unset> 32377/TCP
-Endpoints:      10.0.0.6:8080,10.0.1.6:8080,10.0.1.7:8080 + 2 more...
-Session Affinity:   None
-Events:         <none>
-
-Make a note of the external IP address (LoadBalancer Ingress) exposed by your 
-service. In this example, the external IP address is 104.198.205.71. Also note 
-the value of Port and NodePort. In this example, the Port is 8080 and the 
-NodePort is 32377.
-
-In the preceding output, you can see that the service has several endpoints: 
-10.0.0.6:8080,10.0.1.6:8080,10.0.1.7:8080 + 2 more. These are internal 
-addresses of the pods that are running the Hello World application. To verify 
-these are pod addresses, enter this command:
-
-$ kubectl get pods --output=wide
-NAME                         ...  IP         NODE
-hello-world-2895499144-1jaz9 ...  10.0.1.6   gke-cluster-1-default-pool-e0b8d269-1afc
-hello-world-2895499144-2e5uh ...  10.0.1.8   gke-cluster-1-default-pool-e0b8d269-1afc
-hello-world-2895499144-9m4h1 ...  10.0.0.6   gke-cluster-1-default-pool-e0b8d269-5v7a
-hello-world-2895499144-o4z13 ...  10.0.1.7   gke-cluster-1-default-pool-e0b8d269-1afc
-hello-world-2895499144-segjf ...  10.0.2.5   gke-cluster-1-default-pool-e0b8d269-cpuc
-
-Use the external IP address (LoadBalancer Ingress) to access the Hello World 
-application:
-
-$ curl http://<external-ip>:<port>
-    where <external-ip> is the external IP address (LoadBalancer Ingress) of 
-    your Service, and <port> is the value of Port in your Service description. 
-(sur l'exemple préscedent: $ curl http://104.198.205.71:8080)
-
-The response to a successful request is a hello message:
-
-> Hello Kubernetes!
-
-Cleaning up
-===========
-
-To delete the Service, enter this command:
-
-$ kubectl delete services my-service
-
-To delete the Deployment, the ReplicaSet, and the Pods that are running the 
-Hello World application, enter this command:
-
-$ kubectl delete deployment hello-world
-
-==============================================================================
-==============================================================================
-==============================================================================
-==============================================================================
-==============================================================================
-
-
-ALTERNATIVE PLUS INTERESSANTE - REDIS DISTRIBUE SUR LE CLUSTER
-
-
-Example: Deploying PHP Guestbook application with Redis
-
-This tutorial shows you how to build and deploy a simple, multi-tier web 
-application using Kubernetes and Docker. This example consists of the 
-following components:
+In this section, you will build and deploy a simple, multi-tier web application 
+- a PHP Guestbook application with Redis - using Kubernetes and Docker. This 
+example consists of the following components:
 
     - A single-instance Redis master to store guestbook entries
     - Multiple replicated Redis instances to serve reads
     - Multiple web frontend instances
 
-x.1 - Objectives
-================
 
-    - Start up a Redis master.
-    - Start up Redis slaves.
-    - Start up the guestbook frontend.
-    - Expose and view the Frontend Service.
-    - Clean up.
-
-
-x.2 - Start up the Redis Master
+4.1 - Start up the Redis Master
 ===============================
 
 The guestbook application uses Redis to store its data. It writes its data to 
 a Redis master instance and reads data from multiple Redis slave instances.
 
-a. Creating the Redis Master Deployment
-=======================================
+4.1.1 - Creating the Redis Master Deployment
+============================================
 
 The manifest file, included below, specifies a Deployment controller that runs 
 a single replica Redis master Pod.
@@ -2621,7 +1927,7 @@ $ kubectl logs -f POD-NAME
     Here: $ kubectl logs -f redis-master-1068406935-3lswp
 
 
-b. Creating the Redis Master Service
+4.1.2 - Creating the Redis Master Service
 ====================================
 
 The guestbook applications needs to communicate to the Redis master to write 
@@ -2665,14 +1971,14 @@ redis-master   ClusterIP   10.0.0.151   <none>        6379/TCP   8s
         routes network traffic to the Redis master Pod.
 
 
-x.3 - Start up the Redis Slaves
+4.2 - Start up the Redis Slaves
 ===============================
 
 Although the Redis master is a single pod, you can make it highly available to 
 meet traffic demands by adding replica Redis slaves.
 
-a. Creating the Redis Slave Deployment
-======================================
+4.2.1 - Creating the Redis Slave Deployment
+===========================================
 
 Deployments scale based off of the configurations set in the manifest file. In 
 this case, the Deployment object specifies two replicas.
@@ -2737,8 +2043,8 @@ redis-slave-2005841000-fpvqc    0/1       ContainerCreating   0          6s
 redis-slave-2005841000-phfv9    0/1       ContainerCreating   0          6s
 
 
-b. Creating the Redis Slave Service
-===================================
+4.2.2 - Creating the Redis Slave Service
+========================================
 
 The guestbook application needs to communicate to Redis slaves to read data. 
 To make the Redis slaves discoverable, you need to set up a Service. A Service 
@@ -2776,15 +2082,15 @@ redis-master   ClusterIP   10.0.0.151   <none>        6379/TCP   1m
 redis-slave    ClusterIP   10.0.0.223   <none>        6379/TCP   6s
 
 
-x.4 - Set up and Expose the Guestbook Frontend
+4.3 - Set up and Expose the Guestbook Frontend
 ==============================================
 
 The guestbook application has a web frontend serving the HTTP requests written 
 in PHP. It is configured to connect to the redis-master Service for write 
 requests and the redis-slave service for Read requests.
 
-a. Creating the Guestbook Frontend Deployment
-=============================================
+4.3.1 - Creating the Guestbook Frontend Deployment
+==================================================
 
 (file: application/guestbook/frontend-deployment.yaml)
 
@@ -2840,8 +2146,8 @@ frontend-3823415956-k22zn   1/1       Running   0          54s
 frontend-3823415956-w9gbt   1/1       Running   0          54s
 
 
-b. Creating the Frontend Service
-================================
+4.3.2 - Creating the Frontend Service
+=====================================
 
 The redis-slave and redis-master Services you applied are only accessible 
 within the container cluster because the default type for a Service is 
@@ -2892,8 +2198,8 @@ redis-master   ClusterIP   10.0.0.151   <none>        6379/TCP       2m
 redis-slave    ClusterIP   10.0.0.223   <none>        6379/TCP       1m
 
 
-c. Viewing the Frontend Service via NodePort
-============================================
+4.3.3 - Viewing the Frontend Service via NodePort
+=================================================
 
 If you deployed this application to a local cluster, you need to find the IP 
 address to view your Guestbook. Run the following command to get the IP 
@@ -2905,8 +2211,8 @@ http://192.168.99.100:31323
 Copy the IP address, and load the page in your browser to view your guestbook.
 
 
-d. Viewing the Frontend Service via LoadBalancer
-================================================
+4.3.3 - Viewing the Frontend Service via LoadBalancer
+=====================================================
 
 If you deployed the frontend-service.yaml manifest with type: LoadBalancer you 
 need to find the IP address to view your Guestbook. Run the following command 
@@ -2920,7 +2226,7 @@ Copy the external IP address, and load the page in your browser to view your
 guestbook.
 
 
-x.5 - Scale the Web Frontend
+4.4 - Scale the Web Frontend
 ============================
 
 Scaling up or down is easy because your servers are defined as a Service that 
@@ -2958,7 +2264,7 @@ redis-slave-2005841000-fpvqc    1/1       Running   0          1h
 redis-slave-2005841000-phfv9    1/1       Running   0          1h
 
 
-x.6 - Cleaning up
+4.5 - Cleaning up
 =================
 
 Deleting the Deployments and Services also deletes any running Pods. Use 
@@ -2989,26 +2295,15 @@ No resources found.
 
 
 
+###############################################################################
+#
+# Learn Kubernetes Basics - Part 5 - Conclusion
+#
+###############################################################################
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-==============================================================================
-==============================================================================
-==============================================================================
-==============================================================================
-==============================================================================
-==============================================================================
-==============================================================================
-
+1) This is ultra mega simplistic : no real scale, no network domains, no security...
+2) Inspirational : Kubernetes community is simply great.
+3) Micro-services: keep it simple in order to benefit from Kubernetes even when stateful.
+4) Very very different : everyone need to get a bit into it so that they understand the limitations (there is no magic...à)
 
