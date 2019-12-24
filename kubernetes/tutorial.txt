@@ -832,22 +832,6 @@ thierry@k8s-master:~$ sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
 thierry@k8s-master:~$ sudo chown $(id -u):$(id -g) $HOME/.kube/config
 
 
-Now we need to enable the host machine to actually manage the Kubernetes 
-cluster, and in order to do so, we must get back to the host and create the 
-same .kube directory with the same config file (using the same commands as the
-ones we used to create the directory and file on the master node). Log again as 
-'tso' on the laptop, and remote copy this .kube directory from the master to 
-the laptop:
-
-tso@laptop:~$ scp -r thierry@192.168.0.121:~/.kube ~/.kube
-
-Here you are: you now can manage the Kubernetes cluster from the host machine:
-
-tso@laptop:~$ kubectl get nodes
-NAME         STATUS   ROLES    AGE     VERSION
-k8s-master   Ready    master   9m      v1.17.0
-tso@laptop:~$ kubectl get services -o wide
-
 
 2.4.2 - Deploy a Kubernetes network model
 =========================================
@@ -860,7 +844,7 @@ The configuration file for the 'flannel' network can be directly retrieved from
 the kubernetes github repository, and a copy is available in the tutorial yaml 
 files directory.
 
-tso@laptop:~$ kubectl apply -f https://github.com/coreos/flannel/raw/master/Documentation/kube-flannel.yml
+thierry@k8s-master:~$ kubectl apply -f https://github.com/coreos/flannel/raw/master/Documentation/kube-flannel.yml
 clusterrole.rbac.authorization.k8s.io/flannel created
 clusterrolebinding.rbac.authorization.k8s.io/flannel created
 serviceaccount/flannel created
@@ -935,6 +919,22 @@ Looking at the list of the pods, you see that Kubernetes launched several
 applications: an API server, a proxy, a scheduler, a datastore (ETCD), two
 DNS... and a controller manager. We will see abit later all these functions.
 
+
+2.4.3 - Remotely manage the cluster as a regular user on the laptop
+===================================================================
+
+Now we need to enable the host machine to actually manage the Kubernetes 
+cluster, and in order to do so, we must get back to the host and create the 
+same .kube directory with the same config file (using the same commands as the
+ones we used to create the directory and file on the master node). Log again as 
+'tso' on the laptop, and remote copy this .kube directory from the master to 
+the laptop:
+
+tso@laptop:~$ mkdir -p $HOME/.kube
+tso@laptop:~$ scp -r thierry@192.168.0.124:~/.kube/config ~/.kube/
+tso@laptop:~$ sudo chown $(id -u):$(id -g) $HOME/.kube/config
+
+Here you are: you now can manage the Kubernetes cluster from the host machine. 
 To check that the cluster is alive, you can run the version command:
 
 tso@laptop:~$ kubectl version
@@ -947,13 +947,13 @@ tso@laptop:~$ kubectl cluster-info
 Kubernetes master is running at https://192.168.0.63:6443
 KubeDNS is running at https://192.168.0.63:6443/api/v1/namespaces/kube-system/services/kube-dns:dns/proxy
 
-Nevertheless, the master is still alone; you have not yet joined a slave into
-the cluster. You can see all the nodes in the cluster with the command
-'kubectl get nodes':
-
 tso@laptop:~$ kubectl get nodes
 NAME         STATUS   ROLES    AGE     VERSION
-k8s-master   Ready    master   5m40s   v1.17.0
+k8s-master   Ready    master   9m      v1.17.0
+tso@laptop:~$ kubectl get services -o wide
+
+As you can see, the master is still alone; you have not yet joined a slave 
+into the cluster.
 
 
 2.4.3 - Enroll the two slave nodes into the cluster

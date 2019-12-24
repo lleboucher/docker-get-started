@@ -3,6 +3,218 @@
 =========================
 
 
+Step 1: deploy the dahsboard
+
+    Source: https://kubernetes.io/docs/tasks/access-application-cluster/web-ui-dashboard/
+
+    thierry@k8s-master:~$ kubectl apply -f https://raw.githubusercontent.com/kubernetes/dashboard/v2.0.0-beta8/aio/deploy/recommended.yaml
+
+Step 2: create a sample user to access the dashboard
+
+    Source: https://github.com/kubernetes/dashboard/blob/master/docs/user/access-control/creating-sample-user.md
+    
+    Create a manifest "dashboard-adminuser.yaml"
+    Use it with the command: 
+    thierry@k8s-master:~$ kubectl apply -f dashboard-adminuser.yaml
+
+2.1 Create Service Account
+
+We are creating Service Account with name admin-user in namespace 
+kubernetes-dashboard first.
+
+(file: dashboard-adminuser.yaml)
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: admin-user
+  namespace: kubernetes-dashboard
+
+Then run the command:
+thierry@k8s-master:~$ kubectl apply -f dashboard-adminuser.yaml
+serviceaccount/admin-user created
+
+2.2 Create ClusterRoleBinding
+
+In most cases after provisioning our cluster using kops or kubeadm or any 
+other popular tool, the ClusterRole admin-Role already exists in the cluster. 
+We can use it and create only ClusterRoleBinding for our ServiceAccount.
+
+    NOTE: apiVersion of ClusterRoleBinding resource may differ between 
+        Kubernetes versions. Prior to Kubernetes v1.8 the apiVersion was rbac.authorization.k8s.io/v1beta1.
+
+(file: dashboard-adminrole.yaml)
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: admin-user
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: cluster-admin
+subjects:
+- kind: ServiceAccount
+  name: admin-user
+  namespace: kubernetes-dashboard
+
+Then run the command:
+thierry@k8s-master:~$ kubectl apply -f dashboard-adminrole.yaml
+clusterrolebinding.rbac.authorization.k8s.io/admin-user created
+
+
+
+  
+2.3 Bearer Token
+
+Now we need to find THE token we can use to log in. Execute following command:
+
+For Bash:
+
+thierry@k8s-master:~$ kubectl -n kubernetes-dashboard describe secret $(kubectl -n kubernetes-dashboard get secret | grep admin-user | awk '{print $1}')
+Name:         admin-user-token-7nl7z
+Namespace:    kubernetes-dashboard
+Labels:       <none>
+Annotations:  kubernetes.io/service-account.name: admin-user
+              kubernetes.io/service-account.uid: 22db92cc-4878-4faf-ab4e-1523a396f560
+
+Type:  kubernetes.io/service-account-token
+
+Data
+====
+ca.crt:     1025 bytes
+namespace:  20 bytes
+token:      eyJhbGciOiJSUzI1NiIsImtpZCI6IkV0aG5CR3hWUXo4cVdOaFBKa2xtekdhQ05LVlNvV1hGYm1jcHlaSG1hT1kifQ.eyJpc3MiOiJrdWJlcm5ldGVzL3NlcnZpY2VhY2NvdW50Iiwia3ViZXJuZXRlcy5pby9zZXJ2aWNlYWNjb3VudC9uYW1lc3BhY2UiOiJrdWJlcm5ldGVzLWRhc2hib2FyZCIsImt1YmVybmV0ZXMuaW8vc2VydmljZWFjY291bnQvc2VjcmV0Lm5hbWUiOiJhZG1pbi11c2VyLXRva2VuLTdubDd6Iiwia3ViZXJuZXRlcy5pby9zZXJ2aWNlYWNjb3VudC9zZXJ2aWNlLWFjY291bnQubmFtZSI6ImFkbWluLXVzZXIiLCJrdWJlcm5ldGVzLmlvL3NlcnZpY2VhY2NvdW50L3NlcnZpY2UtYWNjb3VudC51aWQiOiIyMmRiOTJjYy00ODc4LTRmYWYtYWI0ZS0xNTIzYTM5NmY1NjAiLCJzdWIiOiJzeXN0ZW06c2VydmljZWFjY291bnQ6a3ViZXJuZXRlcy1kYXNoYm9hcmQ6YWRtaW4tdXNlciJ9.e6qIABcTZgRlEpbKPig-RsoJJ8UMoBrvocjZ8saj7OpEE9Z49tqBvzHCsp3uzX6gHg5ZNvOwcwpfJvG3QWClqJDFESF2tEm48C-KVei7Wo1Y3xwTVp3Q9tVP09TRwMdzfIqFP_2MkifhFBLkyJ4eDb179RUYLPfM2MKueCy5UoowGiBpqEoHqovxVB1lob4rG2-Y4ugrlwDEcPgOdYQ8dhA0qgBiHwSTMxFnDpuXatl1UutsoSU1HX2DYUevs5U5Y_UF76EI8SRmR23vCmJOt7QhgDcUwekHMUNUwmiF_LqyqUG6jrYSUxzxQQoDzKqtOskq08enBjbTEYu-6MSOsg
+
+
+Test the availability from the master node:
+
+run the proxy from a different terminal:
+thierry@k8s-master:~$ kubectl proxy
+Starting to serve on 127.0.0.1:8001
+
+
+thierry@k8s-master:~$ curl http://localhost:8001/api/v1/namespaces/kubernetes-dashboard/services/https:kubernetes-dashboard/version:/proxy/
+<!--
+Copyright 2017 The Kubernetes Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+-->
+
+<!doctype html>
+<html>
+
+<head>
+  <meta charset="utf-8">
+  <title>Kubernetes Dashboard</title>
+  <link rel="icon" type="image/png" href="assets/images/kubernetes-logo.png"/>
+  <meta name="viewport" content="width=device-width">
+<link rel="stylesheet" href="styles.dd2d1d3576191b87904a.css"></head>
+
+<body>
+  <kd-root></kd-root>
+<script src="runtime.380dd4d7ab4891f91b7b.js" defer=""></script><script src="polyfills-es5.65f1e5151c840cf04c3e.js" nomodule="" defer=""></script><script src="polyfills.8623bbc9d68876cdaaaf.js" defer=""></script><script src="scripts.7d5e232ea538f2c0f8a7.js" defer=""></script><script src="main.3036e86b43f81b098e24.js" defer=""></script></body>
+
+</html>
+
+
+Donc je teste depuis la machine hote:
+
+Dans un terminal different:
+
+tso@laptop:~$ kubectl proxy -p 8080
+Starting to serve on 127.0.0.1:8080
+
+
+Et de retour dasn mon terminal de départ:
+
+tso@laptop:~$ curl http://localhost:8080/api/v1/namespaces/kubernetes-dashboard/services/https:kubernetes-dashboard:/proxy/
+<!--
+Copyright 2017 The Kubernetes Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+-->
+
+<!doctype html>
+<html>
+
+<head>
+  <meta charset="utf-8">
+  <title>Kubernetes Dashboard</title>
+  <link rel="icon" type="image/png" href="assets/images/kubernetes-logo.png"/>
+  <meta name="viewport" content="width=device-width">
+<link rel="stylesheet" href="styles.dd2d1d3576191b87904a.css"></head>
+
+<body>
+  <kd-root></kd-root>
+<script src="runtime.380dd4d7ab4891f91b7b.js" defer=""></script><script src="polyfills-es5.65f1e5151c840cf04c3e.js" nomodule="" defer=""></script><script src="polyfills.8623bbc9d68876cdaaaf.js" defer=""></script><script src="scripts.7d5e232ea538f2c0f8a7.js" defer=""></script><script src="main.3036e86b43f81b098e24.js" defer=""></script></body>
+
+</html>
+
+
+Ca marche !!!!!
+
+
+
+Plusieurs images:
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 FROM:https://github.com/kubernetes/dashboard/blob/master/README.md
 
 tso@laptop:~$ kubectl apply -f https://raw.githubusercontent.com/kubernetes/dashboard/v1.10.1/src/deploy/recommended/kubernetes-dashboard.yaml
