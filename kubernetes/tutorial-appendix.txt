@@ -1,17 +1,15 @@
+
+
 ===============================================================================
 ===============================================================================
 
-APPENDIX 1 - Kubernetes Node & Controllers architecture
+APPENDIX 1 - Kubernetes Node
 
 ===============================================================================
 ===============================================================================
 
 
-========
-1. Nodes
-========
-
-As seen above, a node is a worker machine in Kubernetes. A node may be a VM or 
+A node is a worker machine in Kubernetes. A node may be a VM or 
 physical machine (we then speak of a 'bare metal deployment'), depending on the 
 cluster. Each node contains the services necessary to run pods and is managed 
 by the master components. The services on a node include:
@@ -20,8 +18,9 @@ by the master components. The services on a node include:
     - kube-proxy.
 
 
-Node Status
-===========
+===============
+1 - Node Status
+===============
 
 A node’s status contains the following information:
     - Addresses
@@ -34,8 +33,8 @@ command:
 
 $ kubectl describe node <insert-node-name-here>
 
-Addresses
-=========
+1.1 - Addresses
+===============
 
 The usage of these fields varies depending on your cloud provider or bare metal 
 configuration.
@@ -47,8 +46,8 @@ configuration.
     InternalIP: Typically the IP address of the node that is routable only 
                 within the cluster.
 
-Conditions
-==========
+1.2 - Conditions
+================
 
 The conditions field describes the status of all Running nodes. Examples of 
 conditions include:
@@ -123,8 +122,8 @@ Node can be scheduled on that Node.
       usually less than one second, but it can increase the number of Pods 
       that are successfully scheduled but rejected by the kubelet.
 
-Capacity and Allocatable
-========================
+1.3 - Capacity and Allocatable
+==============================
 
 Describes the resources available on the node: CPU, memory and the maximum 
 number of pods that can be scheduled onto the node.
@@ -136,8 +135,9 @@ that is available to be consumed by normal Pods.
 You may read more about capacity and allocatable resources while learning how 
 to reserve compute resources on a Node.
 
-Info
-====
+
+1.4 - Info
+==========
 
 Describes general information about the node, such as kernel version, 
 Kubernetes version (kubelet and kube-proxy version), Docker version (if used), 
@@ -178,8 +178,8 @@ it becomes valid.
 Currently, there are three components that interact with the Kubernetes node 
 interface: node controller, kubelet, and kubectl.
 
-Node Controller
-===============
+2.1 - Node Controller
+=====================
 
 The node controller is a Kubernetes master component which manages various 
 aspects of nodes.
@@ -205,17 +205,19 @@ The node controller has multiple roles in a node’s life.
       5m after that to start evicting pods.) The node controller checks the 
       state of each node every --node-monitor-period seconds.
 
-In versions of Kubernetes prior to 1.13, NodeStatus is the heartbeat from the 
-node. Node lease feature is enabled by default since 1.14 as a beta feature 
-(feature gate NodeLease, KEP-0009). When node lease feature is enabled, each 
-node has an associated Lease object in kube-node-lease namespace that is 
-renewed by the node periodically, and both NodeStatus and node lease are 
-treated as heartbeats from the node. Node leases are renewed frequently while 
-NodeStatus is reported from node to master only when there is some change or 
-enough time has passed (default is 1 minute, which is longer than the default 
-timeout of 40 seconds for unreachable nodes). Since node lease is much more 
-lightweight than NodeStatus, this feature makes node heartbeat significantly 
-cheaper from both scalability and performance perspectives.
+2.1.1 - Heartbeats
+==================
+
+Heartbeats, sent by Kubernetes nodes, help determine the availability of a node. There are two forms of heartbeats: updates of NodeStatus and the Lease object. Each Node has an associated Lease object in the kube-node-lease namespace . Lease is a lightweight resource, which improves the performance of the node heartbeats as the cluster scales.
+
+The kubelet is responsible for creating and updating the NodeStatus and a Lease object.
+
+    The kubelet updates the NodeStatus either when there is change in status, or if there has been no update for a configured interval. The default interval for NodeStatus updates is 5 minutes (much longer than the 40 second default timeout for unreachable nodes).
+    The kubelet creates and then updates its Lease object every 10 seconds (the default update interval). Lease updates occur independently from the NodeStatus updates.
+    
+
+2.1.2- Reliability
+==================
 
 In Kubernetes 1.4, we updated the logic of the node controller to better 
 handle cases when a large number of nodes have problems with reaching the 
@@ -260,8 +262,8 @@ Starting in version 1.8, the node controller can be made responsible for
 creating taints that represent Node conditions. This is an alpha feature of 
 version 1.8.
 
-Self-Registration of Nodes
-==========================
+2.2 - Self-Registration of Nodes
+================================
 
 When the kubelet flag --register-node is true (the default), the kubelet will 
 attempt to register itself with the API server. This is the preferred pattern, 
@@ -287,8 +289,8 @@ When the Node authorization mode and NodeRestriction admission plugin are
 enabled, kubelets are only authorized to create/modify their own Node resource.
 
 
-Manual Node Administration
-==========================
+2.2.1 - Manual Node Administration
+==================================
 
 A cluster administrator can create and modify node objects.
 
@@ -316,8 +318,8 @@ $ kubectl cordon $NODENAME
         drained of applications while it prepares for a reboot.
 
 
-Node capacity
-=============
+2.3 - Node capacity
+===================
 
 The capacity of the node (number of cpus and amount of memory) is part of the 
 node object. Normally, nodes register themselves and report their capacity 
@@ -332,6 +334,447 @@ nor any process running outside of the containers.
 
 If you want to explicitly reserve resources for non-Pod processes, follow this 
 tutorial to reserve resources for system daemons.
+
+
+
+
+===============================================================================
+===============================================================================
+
+APPENDIX 2 - Master-Node Communication
+
+===============================================================================
+===============================================================================
+
+This document catalogs the communication paths between the master (really the apiserver) and the Kubernetes cluster. The intent is to allow users to customize their installation to harden the network configuration such that the cluster can be run on an untrusted network (or on fully public IPs on a cloud provider).
+
+
+2.1 - Cluster to Master
+=======================
+
+All communication paths from the cluster to the master terminate at the apiserver (none of the other master components are designed to expose remote services). In a typical deployment, the apiserver is configured to listen for remote connections on a secure HTTPS port (443) with one or more forms of client authentication enabled. One or more forms of authorization should be enabled, especially if anonymous requests or service account tokens are allowed.
+
+Nodes should be provisioned with the public root certificate for the cluster such that they can connect securely to the apiserver along with valid client credentials. For example, on a default GKE deployment, the client credentials provided to the kubelet are in the form of a client certificate. See kubelet TLS bootstrapping for automated provisioning of kubelet client certificates.
+
+Pods that wish to connect to the apiserver can do so securely by leveraging a service account so that Kubernetes will automatically inject the public root certificate and a valid bearer token into the pod when it is instantiated. The kubernetes service (in all namespaces) is configured with a virtual IP address that is redirected (via kube-proxy) to the HTTPS endpoint on the apiserver.
+
+The master components also communicate with the cluster apiserver over the secure port.
+
+As a result, the default operating mode for connections from the cluster (nodes and pods running on the nodes) to the master is secured by default and can run over untrusted and/or public networks.
+
+
+2.2 - Master to Cluster
+=======================
+
+There are two primary communication paths from the master (apiserver) to the cluster. The first is from the apiserver to the kubelet process which runs on each node in the cluster. The second is from the apiserver to any node, pod, or service through the apiserver’s proxy functionality.
+
+
+2.2.1 - apiserver to kubelet
+============================
+
+The connections from the apiserver to the kubelet are used for:
+
+    Fetching logs for pods.
+    Attaching (through kubectl) to running pods.
+    Providing the kubelet’s port-forwarding functionality.
+
+These connections terminate at the kubelet’s HTTPS endpoint. By default, the apiserver does not verify the kubelet’s serving certificate, which makes the connection subject to man-in-the-middle attacks, and unsafe to run over untrusted and/or public networks.
+
+To verify this connection, use the --kubelet-certificate-authority flag to provide the apiserver with a root certificate bundle to use to verify the kubelet’s serving certificate.
+
+If that is not possible, use SSH tunneling between the apiserver and kubelet if required to avoid connecting over an untrusted or public network.
+
+Finally, Kubelet authentication and/or authorization should be enabled to secure the kubelet API.
+
+
+2.2.2 - apiserver to nodes, pods, and services
+==============================================
+
+The connections from the apiserver to a node, pod, or service default to plain HTTP connections and are therefore neither authenticated nor encrypted. They can be run over a secure HTTPS connection by prefixing https: to the node, pod, or service name in the API URL, but they will not validate the certificate provided by the HTTPS endpoint nor provide client credentials so while the connection will be encrypted, it will not provide any guarantees of integrity. These connections are not currently safe to run over untrusted and/or public networks.
+
+
+2.2.3 - SSH Tunnels
+===================
+
+Kubernetes supports SSH tunnels to protect the Master -> Cluster communication paths. In this configuration, the apiserver initiates an SSH tunnel to each node in the cluster (connecting to the ssh server listening on port 22) and passes all traffic destined for a kubelet, node, pod, or service through the tunnel. This tunnel ensures that the traffic is not exposed outside of the network in which the nodes are running.
+
+SSH tunnels are currently deprecated so you shouldn’t opt to use them unless you know what you are doing. A replacement for this communication channel is being designed.
+
+
+===============================================================================
+===============================================================================
+
+APPENDIX 3 - Controllers
+
+===============================================================================
+===============================================================================
+
+
+In robotics and automation, a control loop is a non-terminating loop that regulates the state of a system.
+
+Here is one example of a control loop: a thermostat in a room.
+
+When you set the temperature, that’s telling the thermostat about your desired state. The actual room temperature is the current state. The thermostat acts to bring the current state closer to the desired state, by turning equipment on or off.
+
+In Kubernetes, controllers are control loops that watch the state of your cluster , then make or request changes where needed. Each controller tries to move the current cluster state closer to the desired state.
+
+
+3.1 - Controller pattern
+========================
+
+A controller tracks at least one Kubernetes resource type. These objects have a spec field that represents the desired state. The controller(s) for that resource are responsible for making the current state come closer to that desired state.
+
+The controller might carry the action out itself; more commonly, in Kubernetes, a controller will send messages to the API server that have useful side effects. You’ll see examples of this below.
+
+
+3.1.1 - Control via API server
+==============================
+
+The Job controller is an example of a Kubernetes built-in controller. Built-in controllers manage state by interacting with the cluster API server.
+
+Job is a Kubernetes resource that runs a Pod , or perhaps several Pods, to carry out a task and then stop.
+
+(Once scheduled, Pod objects become part of the desired state for a kubelet).
+
+When the Job controller sees a new task it makes sure that, somewhere in your cluster, the kubelets on a set of Nodes are running the right number of Pods to get the work done. The Job controller does not run any Pods or containers itself. Instead, the Job controller tells the API server to create or remove Pods. Other components in the control plane act on the new information (there are new Pods to schedule and run), and eventually the work is done.
+
+After you create a new Job, the desired state is for that Job to be completed. The Job controller makes the current state for that Job be nearer to your desired state: creating Pods that do the work you wanted for that Job, so that the Job is closer to completion.
+
+Controllers also update the objects that configure them. For example: once the work is done for a Job, the Job controller updates that Job object to mark it Finished.
+
+(This is a bit like how some thermostats turn a light off to indicate that your room is now at the temperature you set).
+
+
+3.1.2 - Direct control
+======================
+
+By contrast with Job, some controllers need to make changes to things outside of your cluster.
+
+For example, if you use a control loop to make sure there are enough Nodes in your cluster, then that controller needs something outside the current cluster to set up new Nodes when needed.
+
+Controllers that interact with external state find their desired state from the API server, then communicate directly with an external system to bring the current state closer in line.
+
+(There actually is a controller that horizontally scales the nodes in your cluster. See Cluster autoscaling).
+
+
+3.2 - Desired versus current state
+==================================
+
+Kubernetes takes a cloud-native view of systems, and is able to handle constant change.
+
+Your cluster could be changing at any point as work happens and control loops automatically fix failures. This means that, potentially, your cluster never reaches a stable state.
+
+As long as the controllers for your cluster are running and able to make useful changes, it doesn’t matter if the overall state is or is not stable.
+
+
+3.3 - Design
+============
+
+As a tenet of its design, Kubernetes uses lots of controllers that each manage a particular aspect of cluster state. Most commonly, a particular control loop (controller) uses one kind of resource as its desired state, and has a different kind of resource that it manages to make that desired state happen.
+
+It’s useful to have simple controllers rather than one, monolithic set of control loops that are interlinked. Controllers can fail, so Kubernetes is designed to allow for that.
+
+For example: a controller for Jobs tracks Job objects (to discover new work) and Pod object (to run the Jobs, and then to see when the work is finished). In this case something else creates the Jobs, whereas the Job controller creates Pods.
+
+    Note:
+
+    There can be several controllers that create or update the same kind of object. Behind the scenes, Kubernetes controllers make sure that they only pay attention to the resources linked to their controlling resource.
+
+    For example, you can have Deployments and Jobs; these both create Pods. The Job controller does not delete the Pods that your Deployment created, because there is information (labels ) the controllers can use to tell those Pods apart.
+
+
+3.4 - Ways of running controllers
+=================================
+
+Kubernetes comes with a set of built-in controllers that run inside the kube-controller-manager . These built-in controllers provide important core behaviors.
+
+The Deployment controller and Job controller are examples of controllers that come as part of Kubernetes itself (“built-in” controllers). Kubernetes lets you run a resilient control plane, so that if any of the built-in controllers were to fail, another part of the control plane will take over the work.
+
+You can find controllers that run outside the control plane, to extend Kubernetes. Or, if you want, you can write a new controller yourself. You can run your own controller as a set of Pods, or externally to Kubernetes. What fits best will depend on what that particular controller does.
+
+
+3.5 - What's next
+=================
+
+    Read about the Kubernetes control plane
+    Discover some of the basic Kubernetes objects
+    Learn more about the Kubernetes API
+    If you want to write your own controller, see Extension Patterns in Extending Kubernetes.
+
+
+
+
+
+
+
+===============================================================================
+===============================================================================
+
+APPENDIX 4 - Concepts Underlying the Cloud Controller Manager
+
+===============================================================================
+===============================================================================
+
+The cloud controller manager (CCM) concept (not to be confused with the binary) was originally created to allow cloud specific vendor code and the Kubernetes core to evolve independent of one another. The cloud controller manager runs alongside other master components such as the Kubernetes controller manager, the API server, and scheduler. It can also be started as a Kubernetes addon, in which case it runs on top of Kubernetes.
+
+The cloud controller manager’s design is based on a plugin mechanism that allows new cloud providers to integrate with Kubernetes easily by using plugins. There are plans in place for on-boarding new cloud providers on Kubernetes and for migrating cloud providers from the old model to the new CCM model.
+
+This document discusses the concepts behind the cloud controller manager and gives details about its associated functions.
+
+Here’s the architecture of a Kubernetes cluster without the cloud controller manager:
+
+(image: Cloud Controller Manager)
+
+
+
+4.1 - Design
+============
+
+In the preceding diagram, Kubernetes and the cloud provider are integrated through several different components:
+
+    Kubelet
+    Kubernetes controller manager
+    Kubernetes API server
+
+The CCM consolidates all of the cloud-dependent logic from the preceding three components to create a single point of integration with the cloud. The new architecture with the CCM looks like this:
+
+(image: Cloud Controller Manager)
+
+
+4.2 - Components of the CCM
+===========================
+
+The CCM breaks away some of the functionality of Kubernetes controller manager (KCM) and runs it as a separate process. Specifically, it breaks away those controllers in the KCM that are cloud dependent. The KCM has the following cloud dependent controller loops:
+
+    Node controller
+    Volume controller
+    Route controller
+    Service controller
+
+In version 1.9, the CCM runs the following controllers from the preceding list:
+
+    Node controller
+    Route controller
+    Service controller
+
+    Note: Volume controller was deliberately chosen to not be a part of CCM. Due to the complexity involved and due to the existing efforts to abstract away vendor specific volume logic, it was decided that volume controller will not be moved to CCM.
+
+The original plan to support volumes using CCM was to use Flex volumes to support pluggable volumes. However, a competing effort known as CSI is being planned to replace Flex.
+
+Considering these dynamics, we decided to have an intermediate stop gap measure until CSI becomes ready.
+
+
+4.3 - Functions of the CCM
+==========================
+
+The CCM inherits its functions from components of Kubernetes that are dependent on a cloud provider. This section is structured based on those components.
+
+4.3.1 - Kubernetes controller manager
+=====================================
+
+The majority of the CCM’s functions are derived from the KCM. As mentioned in the previous section, the CCM runs the following control loops:
+
+    Node controller
+    Route controller
+    Service controller
+
+4.3.1.1 - Node controller
+
+The Node controller is responsible for initializing a node by obtaining information about the nodes running in the cluster from the cloud provider. The node controller performs the following functions:
+
+    Initialize a node with cloud specific zone/region labels.
+    Initialize a node with cloud specific instance details, for example, type and size.
+    Obtain the node’s network addresses and hostname.
+    In case a node becomes unresponsive, check the cloud to see if the node has been deleted from the cloud. If the node has been deleted from the cloud, delete the Kubernetes Node object.
+
+4.3.1.2 - Route controller
+
+The Route controller is responsible for configuring routes in the cloud appropriately so that containers on different nodes in the Kubernetes cluster can communicate with each other. The route controller is only applicable for Google Compute Engine clusters.
+Service Controller
+
+The Service controller is responsible for listening to service create, update, and delete events. Based on the current state of the services in Kubernetes, it configures cloud load balancers (such as ELB , Google LB, or Oracle Cloud Infrastructure LB) to reflect the state of the services in Kubernetes. Additionally, it ensures that service backends for cloud load balancers are up to date.
+
+4.3.2 - Kubelet
+===============
+
+The Node controller contains the cloud-dependent functionality of the kubelet. Prior to the introduction of the CCM, the kubelet was responsible for initializing a node with cloud-specific details such as IP addresses, region/zone labels and instance type information. The introduction of the CCM has moved this initialization operation from the kubelet into the CCM.
+
+In this new model, the kubelet initializes a node without cloud-specific information. However, it adds a taint to the newly created node that makes the node unschedulable until the CCM initializes the node with cloud-specific information. It then removes this taint.
+
+
+4.4 - Plugin mechanism
+======================
+
+The cloud controller manager uses Go interfaces to allow implementations from any cloud to be plugged in. Specifically, it uses the CloudProvider Interface defined here.
+
+The implementation of the four shared controllers highlighted above, and some scaffolding along with the shared cloudprovider interface, will stay in the Kubernetes core. Implementations specific to cloud providers will be built outside of the core and implement interfaces defined in the core.
+
+For more information about developing plugins, see Developing Cloud Controller Manager.
+
+
+4.5 - Authorization
+===================
+
+This section breaks down the access required on various API objects by the CCM to perform its operations.
+
+4.5.1 - Node Controller
+
+The Node controller only works with Node objects. It requires full access to get, list, create, update, patch, watch, and delete Node objects.
+
+v1/Node:
+
+    Get
+    List
+    Create
+    Update
+    Patch
+    Watch
+    Delete
+
+4.5.2 - Route controller
+
+The route controller listens to Node object creation and configures routes appropriately. It requires get access to Node objects.
+
+v1/Node:
+
+    Get
+
+4.5.3 - Service controller
+
+The service controller listens to Service object create, update and delete events and then configures endpoints for those Services appropriately.
+
+To access Services, it requires list, and watch access. To update Services, it requires patch and update access.
+
+To set up endpoints for the Services, it requires access to create, list, get, watch, and update.
+
+v1/Service:
+
+    List
+    Get
+    Watch
+    Patch
+    Update
+
+4.5.4 - Others
+
+The implementation of the core of CCM requires access to create events, and to ensure secure operation, it requires access to create ServiceAccounts.
+
+v1/Event:
+
+    Create
+    Patch
+    Update
+
+v1/ServiceAccount:
+
+    Create
+
+The RBAC ClusterRole for the CCM looks like this:
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: cloud-controller-manager
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - events
+  verbs:
+  - create
+  - patch
+  - update
+- apiGroups:
+  - ""
+  resources:
+  - nodes
+  verbs:
+  - '*'
+- apiGroups:
+  - ""
+  resources:
+  - nodes/status
+  verbs:
+  - patch
+- apiGroups:
+  - ""
+  resources:
+  - services
+  verbs:
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - ""
+  resources:
+  - serviceaccounts
+  verbs:
+  - create
+- apiGroups:
+  - ""
+  resources:
+  - persistentvolumes
+  verbs:
+  - get
+  - list
+  - update
+  - watch
+- apiGroups:
+  - ""
+  resources:
+  - endpoints
+  verbs:
+  - create
+  - get
+  - list
+  - watch
+  - update
+
+
+4.6 - Vendor Implementations
+============================
+
+The following cloud providers have implemented CCMs:
+
+    AWS
+    Azure
+    BaiduCloud
+    DigitalOcean
+    GCP
+    Linode
+    OpenStack
+    Oracle
+    TencentCloud
+
+
+4.7 - Cluster Administration
+============================
+
+Complete instructions for configuring and running the CCM are provided here (https://kubernetes.io/docs/tasks/administer-cluster/running-cloud-controller/#cloud-controller-manager).
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
