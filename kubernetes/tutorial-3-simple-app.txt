@@ -5,42 +5,11 @@
 #############################################################################
 
 
+1 - Kubernetes Deployments
+==========================
 
 Once you have a running Kubernetes cluster, you can deploy your containerized 
-applications on top of it. To do so, you create a Kubernetes 'Deployment' 
-configuration. The Deployment instructs Kubernetes how to create and update 
-instances of your application. Once you've created a Deployment, the 
-Kubernetes master schedules mentioned application instances onto individual 
-Nodes in the cluster.
-
-Once the application instances are created, a Kubernetes Deployment Controller 
-continuously monitors those instances. If the Node hosting an instance goes 
-down or is deleted, the Deployment controller replaces the instance with an 
-instance on another Node in the cluster. This provides a self-healing 
-mechanism to address machine failure or maintenance.
-
-In a pre-orchestration world, installation scripts would often be used to 
-start applications, but they did not allow recovery from machine failure. By 
-both creating your application instances and keeping them running across 
-Nodes, Kubernetes Deployments provide a fundamentally different approach to 
-application management.
-
-
-3.1 - Kubernetes Deployments
-============================
-
-To deploy your containerized application on top of the cluster, you create what 
-is called a "Kubernetes Deployment". The Deployment maerializes through a text 
-file which defines the target state of your application (which application - 
-i.e. which Docker container or which set of containers which compose your 
-application -, on how many nodes - in order to bring resilience - or other 
-criterias your application should respect once it is actually deployed on the 
-cluster). This text file instructs Kubernetes how to create and update 
-instances of your application (actually, it tells the Kubernetes Controller 
-Manager to spawn a Deployment Controller which will read this text file: the 
-Deployment Controller will tell the Kubernetes master how to 'schedules' 
-mentioned pods onto individual Nodes in the cluster, each pod carrying the 
-containers composing your application).
+applications on top of it. To deploy your containerized application on top of the cluster, you create what is called a "Kubernetes Deployment". The Deployment maerializes through a text file (yet another a YAML file) which defines the target state of your application (which application - i.e. which Docker container or which set of containers - will compose your application, on how many nodes - in order to bring resilience - or other criterias your application should respect once it is actually deployed on the cluster). This text file instructs Kubernetes how to create and update instances of your application (actually, it tells the Kubernetes Controller Manager to spawn a Deployment Controller which will read this text file: the Deployment Controller will tell the Kubernetes master how to 'schedules' the pods onto individual Nodes in the cluster, each pod carrying the containers composing your application).
 
 Once the application instances are created, the Kubernetes Deployment 
 Controller continuously monitors those instances. If the Node hosting an 
@@ -59,8 +28,8 @@ Kubernetes Deployments provide a fundamentally different approach to
 application management.
 
 
-3.2 - Deploying your first app on Kubernetes
-============================================
+2 - Deploying your first app on Kubernetes
+==========================================
 
 You can create and manage a Deployment by using the Kubernetes command line 
 interface, Kubectl. Kubectl uses the Kubernetes API to interact with the 
@@ -69,27 +38,51 @@ to create Deployments that run your applications on a Kubernetes cluster.
 
 When you create a Deployment, you'll need to specify the container image for 
 your application and the number of replicas that you want to run. You can 
-change that information later by updating your Deployment; sections 3.5 and 3.6 
-of this tutorial discuss how you can scale and update your Deployments.
+change that information later by updating your Deployment (i.e. updating the 
+YAML file); sections 5 and 6 of this tutorial discuss how you can scale and 
+update your Deployments.
 
-Applications need to be packaged into one of the supported container formats in 
-order to be deployed on Kubernetes: here we will use Docker.
+Applications need to be packaged into one of the supported container formats 
+in order to be deployed on Kubernetes: here we will use Docker.
 
 For your first Deployment, you'll use a Node.js application packaged in a 
 Docker container. The image is provided in the Kubernetes official site
 (https://kubernetes.io/docs/tutorials/hello-minikube/), so we don't have to 
 actually code a new application for our tutorial. The corresponding node.js 
 script and the dockerfile are available in the "hello-world" directory if you
-want to build your local image.
+want to re-build your local image.
 
 Let’s deploy our first app on Kubernetes with the 'kubectl create deployment'
 command. We need to provide the deployment name and app image location 
 (include the full repository url for images hosted outside Docker hub).
 
-tso@laptop:~$ kubectl create deployment kubernetes-bootcamp --image=gcr.io/google-samples/kubernetes-bootcamp:v1
+thierry@Ubuntu-thierry:~$ kubectl create deployment hello --image=gcr.io/google-samples/node-hello:1.0 
+deployment.apps/hello created
 
-Great! You just deployed your first application by creating a deployment. This 
-performed a few things for you:
+Great! You just deployed your first application by creating a deployment 
+(which you can also see in the dashboard (image: 
+'dashboard-deployment-first'). You can also see that it created a Pod called 
+'kubernetes-bootcamp-69fbc6f4cf-k2t92' as it is visible on the dashboard 
+(image: 'dashboard-pod-bootcamp').
+
+You can see it from the terminal:
+
+thierry@Ubuntu-thierry:~$ kubectl get pods
+NAME                                   READY   STATUS    RESTARTS   AGE
+kubernetes-bootcamp-69fbc6f4cf-k2t92   1/1     Running   0          4m26s
+
+    Note: from now on, we assume that you will go frequently on the dashboard 
+        to check the changes happening on the cluster, and we will focus the 
+        tutorial on the CLI commadns and results as they appear in the 
+        terminal. Again, the purpose is solely to get you aquainted with the 
+        Kubernetes concepts and to manipulate the cluster, while you may get 
+        far more efficient at manipulating directly the REST APIs or managing 
+        some actions via the dashboard itself.
+        So, as of now, we will not mention directly screenshots related to the 
+        progress on the tutorial, but you may see more screenshots in the 
+        'images' directory.
+
+This 'create deployment' command performed a few things for you:
 
     - searched for a suitable node where an instance of the application could 
       be run (we have only 1 available node)
@@ -99,16 +92,38 @@ performed a few things for you:
 
 To list your deployments use the get deployments command:
 
-$ kubectl get deployments
+thierry@Ubuntu-thierry:~$ kubectl get deployments
+NAME                  READY   UP-TO-DATE   AVAILABLE   AGE
+kubernetes-bootcamp   1/1     1            1           8m25s
 
-We see that there is 1 deployment running a single instance of your app. The 
-instance is running inside a Docker container on your node.
+Let's details this line since you will see later in the tutorial many results 
+similar to this one:
+    - The 1/1 means '1 ready for 1 Desired': 1 ready is the number of pod 
+        active (with  the container which is mentioned in the YAML file) and 
+        the YAML file specifies that we should always have 1 instance running.
+    - The 1 UP-TO-DATE means that the one active is of the right version: 
+        there is consequently no need for Kubernetes to update the Pod with a 
+        fresher version.
+    - The 1 AVAILABLE means that 1 isntance of the Pod is actually available 
+        to the end-users (and there could be many reasons for which the Pod 
+        would not be available: for instance, the network could be down for a 
+        part of the cluster, thus the corresponding Node would beisolated, and 
+        Kubernetes would have to spawn a new instance of the Pod on another 
+        Node with good conenctivity, in order to secure that the end-users 
+        keep having 1 instance truely available to them).
+
+We can see here that there is 1 deployment, running 1 single instance of your 
+app. The instance is running inside a Docker container on one of the nodes. To 
+get more details, we expand the results of the 'get pods' command: we can see 
+that this Pod is running on the slave 2.
+
+thierry@Ubuntu-thierry:~$ kubectl get pods -o wide
+NAME                                   READY   STATUS    RESTARTS   AGE   IP           NODE         NOMINATED NODE   READINESS GATES
+kubernetes-bootcamp-69fbc6f4cf-k2t92   1/1     Running   0          17m   10.244.2.2   k8s-slave2   <none>           <none>
 
 
-
-
-3.3 - Deploying an App
-======================
+3 - Connecting to your app from within the cluster
+==================================================
 
 Pods that are running inside Kubernetes are running on a private, isolated 
 network. By default they are visible from other pods and services within the 
@@ -124,8 +139,8 @@ control-C and won't show any output while its running.
 
 We will open a second terminal window to run the proxy.
 
-$ echo -e "\n\n\n\e[92mStarting Proxy. After starting it will not output a response. Please click the first Terminal Tab\n"; 
-kubectl proxy
+thierry@Ubuntu-thierry:~$ kubectl proxy -p 8080
+Starting to serve on 127.0.0.1:8080
 
 We now have a connection between our host (the online terminal) and the 
 Kubernetes cluster. The proxy enables direct access to the API from these 
@@ -134,7 +149,7 @@ terminals.
 You can see all those APIs hosted through the proxy endpoint. For example, we 
 can query the version directly through the API using the curl command:
 
-$ curl http://localhost:8001/version
+thierry@Ubuntu-thierry:~$ curl http://localhost:8080/version
 {
   "major": "1",
   "minor": "17",
@@ -147,7 +162,7 @@ $ curl http://localhost:8001/version
   "platform": "linux/amd64"
 }
 
-If Port 8001 is not accessible, ensure that the kubectl proxy started above is 
+If Port 8080 is not accessible, ensure that the kubectl proxy started above is 
 running.
 
 The API server will automatically create an endpoint for each pod, based on 
@@ -156,27 +171,27 @@ the pod name, that is also accessible through the proxy.
 First we need to get the Pod name, and we'll store in the environment variable 
 POD_NAME:
 
-$ export POD_NAME=$(kubectl get pods -o go-template --template '{{range .items}}{{.metadata.name}}{{"\n"}}{{end}}')
-echo Name of the Pod: $POD_NAME
+thierry@Ubuntu-thierry:~$ export POD_NAME=$(kubectl get pods -o go-template --template '{{range .items}}{{.metadata.name}}{{"\n"}}{{end}}')
+thierry@Ubuntu-thierry:~$ echo Name of the Pod: $POD_NAME
+Name of the Pod: kubernetes-bootcamp-69fbc6f4cf-k2t92
 
-Note: Check the top of the terminal. The proxy was run in a new tab 
-(Terminal 2), and the recent commands were executed the original tab 
-(Terminal 1). The proxy still runs in the second tab, and this allowed our 
-curl command to work using localhost:8001.
+    Note: Check the top of the terminal. The proxy was run in a new tab 
+        (Terminal 2), and the recent commands were executed the original tab 
+        (Terminal 1). The proxy still runs in the second tab, and this allowed 
+        our curl command to work using localhost:8080.
 
 In order for the new deployment to be accessible without using the Proxy, a 
 Service is required which will be explained in the next modules.
 
 
+4 - Explore your app
+====================
 
-3.4 - Explore your app
-======================
 
+4.1 - Kubernetes Pods
+=====================
 
-3.4.1 - Kubernetes Pods
-=======================
-
-When you created a Deployment in Module 2, Kubernetes created a Pod to host 
+When you created a Deployment in Section 2, Kubernetes created a Pod to host 
 your application instance. A Pod is a Kubernetes abstraction that represents a 
 group of one or more application containers (such as Docker or rkt), and some 
 shared resources for those containers. Those resources include:
@@ -190,9 +205,9 @@ A Pod models an application-specific "logical host" and can contain different
 application containers which are relatively tightly coupled. For example, a 
 Pod might include both the container with your Node.js app as well as a 
 different container that feeds the data to be published by the Node.js 
-webserver. The containers in a Pod share an IP Address and port space, are 
-always co-located and co-scheduled, and run in a shared context on the same 
-Node.
+webserver. The containers in a Pod share the same IP Address and port space, 
+are always co-located and co-scheduled, and run in a shared context on the 
+same Node.
 
 Pods are the atomic unit on the Kubernetes platform. When we create a 
 Deployment on Kubernetes, that Deployment creates Pods with containers inside 
@@ -203,14 +218,13 @@ scheduled on other available Nodes in the cluster.
 
 Pods overview (image "view your app - pod overview")
 
- 
-3.4.2 - Nodes
+4.2 - Nodes
 ===========
 
 A Pod always runs on a Node. A Node is a worker machine in Kubernetes and may 
 be either a virtual or a physical machine, depending on the cluster. Each Node 
 is managed by the Master. A Node can have multiple pods, and the Kubernetes 
-master automatically handles scheduling the pods across the Nodes in the 
+Master automatically handles scheduling the pods across the Nodes in the 
 cluster. The Master's automatic scheduling takes into account the available 
 resources on each Node.
 
@@ -223,50 +237,75 @@ Every Kubernetes Node runs at least:
         container image from a registry, unpacking the container, and running 
         the application.
 
-Containers should only be scheduled together in a single Pod if they are tightly coupled and need to share resources such as disk.
+Containers should only be scheduled together in a single Pod if they are 
+tightly coupled and need to share resources such as disk.
 
 Node overview (image "view your app - node overview")
 
 
-3.4.3 - Troubleshooting with kubectl
-==================================
+4.3 - Check the application configuration
+=========================================
 
-In Module 2, you used Kubectl command-line interface. You'll continue to use 
-it in Module 3 to get information about deployed applications and their 
-environments. The most common operations can be done with the following 
-kubectl commands:
+We already have checked the pods with kubectl, so we know that a 
+kubernetes-bootcamp pod runs on the slave 2. Now, let's view what containers 
+are inside that Pod and what images are used to build those containers. To do 
+so, we run the describe pods command:
 
-    kubectl get - list resources
-    kubectl describe - show detailed information about a resource
-    kubectl logs - print the logs from a container in a pod
-    kubectl exec - execute a command on a container in a pod
+thierry@Ubuntu-thierry:~$ kubectl describe pods
+Name:         kubernetes-bootcamp-69fbc6f4cf-k2t92
+Namespace:    default
+Priority:     0
+Node:         k8s-slave2/10.0.2.15
+Start Time:   Fri, 27 Dec 2019 17:44:58 +0100
+Labels:       app=kubernetes-bootcamp
+              pod-template-hash=69fbc6f4cf
+Annotations:  <none>
+Status:       Running
+IP:           10.244.2.2
+IPs:
+  IP:           10.244.2.2
+Controlled By:  ReplicaSet/kubernetes-bootcamp-69fbc6f4cf
+Containers:
+  kubernetes-bootcamp:
+    Container ID:   docker://aff46533626e6cfdff6b3ecef622e33eed0f00260465a6924d1f1620cca6c447
+    Image:          gcr.io/google-samples/kubernetes-bootcamp:v1
+    Image ID:       docker-pullable://gcr.io/google-samples/kubernetes-bootcamp@sha256:0d6b8ee63bb57c5f5b6156f446b3bc3b3c143d233037f3a2f00e279c8fcc64af
+    Port:           <none>
+    Host Port:      <none>
+    State:          Running
+      Started:      Fri, 27 Dec 2019 17:45:13 +0100
+    Ready:          True
+    Restart Count:  0
+    Environment:    <none>
+    Mounts:
+      /var/run/secrets/kubernetes.io/serviceaccount from default-token-hk4xc (ro)
+Conditions:
+  Type              Status
+  Initialized       True 
+  Ready             True 
+  ContainersReady   True 
+  PodScheduled      True 
+Volumes:
+  default-token-hk4xc:
+    Type:        Secret (a volume populated by a Secret)
+    SecretName:  default-token-hk4xc
+    Optional:    false
+QoS Class:       BestEffort
+Node-Selectors:  <none>
+Tolerations:     node.kubernetes.io/not-ready:NoExecute for 300s
+                 node.kubernetes.io/unreachable:NoExecute for 300s
+Events:
+  Type    Reason     Age   From                 Message
+  ----    ------     ----  ----                 -------
+  Normal  Scheduled  29m   default-scheduler    Successfully assigned default/kubernetes-bootcamp-69fbc6f4cf-k2t92 to k8s-slave2
+  Normal  Pulling    29m   kubelet, k8s-slave2  Pulling image "gcr.io/google-samples/kubernetes-bootcamp:v1"
+  Normal  Pulled     29m   kubelet, k8s-slave2  Successfully pulled image "gcr.io/google-samples/kubernetes-bootcamp:v1"
+  Normal  Created    29m   kubelet, k8s-slave2  Created container kubernetes-bootcamp
+  Normal  Started    29m   kubelet, k8s-slave2  Started container kubernetes-bootcamp
 
-You can use these commands to see when applications were deployed, what their 
-current statuses are, where they are running and what their configurations 
-are.
 
-Now that we know more about our cluster components and the command line, let's 
-explore our application.
-
-3.4.4 - Check application configuration
-======================================
-
-Let’s verify that the application we deployed in the previous scenario is 
-running. We’ll use the kubectl get command and look for existing Pods:
-
-$ kubectl get pods
-
-If no pods are running then it means the interactive environment is still 
-reloading it's previous state. Please wait a couple of seconds and list the 
-Pods again. You can continue once you see the one Pod running.
-
-Next, to view what containers are inside that Pod and what images are used to 
-build those containers we run the describe pods command:
-
-$ kubectl describe pods
-
-We see here details about the Pod’s container: IP address, the ports used and 
-a list of events related to the lifecycle of the Pod.
+Whaou... Plenty of information is available, as you can see: IP address, the 
+ports used and a list of events related to the lifecycle of the Pod.
 
 The output of the describe command is extensive and covers some concepts that 
 we didn’t explain yet, but don’t worry, they will become familiar by the end 
@@ -278,47 +317,246 @@ of this bootcamp.
         against.
 
 
-3.4.5 - Show the app in the terminal
+4.4 - Show the app in the terminal
 ===================================
 
-Recall that Pods are running in an isolated, private network - so we need to 
-proxy access to them so we can debug and interact with them. To do this, we'll 
-use the kubectl proxy command to run a proxy in a second terminal window. 
-Click on the command below to automatically open a new terminal and run the 
-proxy:
+Recall that Pods are running in an isolated, private network - so we continue 
+with the kubectl proxy command in a second terminal window (on prt 8080). 
 
-$ echo -e "\n\n\n\e[92mStarting Proxy. After starting it will not output a response. Please click the first Terminal Tab\n"; kubectl proxy
-
-Now again, we'll get the Pod name and query that pod directly through the 
-proxy. To get the Pod name and store it in the POD_NAME environment variable:
-
-$ export POD_NAME=$(kubectl get pods -o go-template --template '{{range .items}}{{.metadata.name}}{{"\n"}}{{end}}')
-echo Name of the Pod: $POD_NAME
+You have store the Pod name in the POD_NAME environment variable.
 
 To see the output of our application, run a curl request.
 
-$ curl http://localhost:8001/api/v1/namespaces/default/pods/$POD_NAME/proxy/
+thierry@Ubuntu-thierry:~$ kubectl get namespace
+NAME                   STATUS   AGE
+default                Active   129m
+kube-node-lease        Active   129m
+kube-public            Active   129m
+kube-system            Active   129m
+kubernetes-dashboard   Active   104m
+thierry@Ubuntu-thierry:~$ echo $POD_NAME
+kubernetes-bootcamp-69fbc6f4cf-k2t92
+thierry@Ubuntu-thierry:~$ curl http://localhost:8080/api/v1/namespace/default/pods/$POD_NAME/
+{
+  "kind": "Status",
+  "apiVersion": "v1",
+  "metadata": {
+    
+  },
+  "status": "Failure",
+  "message": "the server could not find the requested resource",
+  "reason": "NotFound",
+  "details": {
+    
+  },
+  "code": 404
+}
 
-The url is the route to the API of the Pod.
+Arg... Can't see why it does not show the details, while everything is 
+available on the dashboard... Since I get a lot of detils when polling the 
+'pods' URL (curl http://localhost:8080/api/v1/pods/), I guess htat this is 
+related to not having the right API signature...
+
+Let's try it from another angle: we first list the pods and grep the 'kubernetes-bootcamp' from it. There is an interesting field called 'selfLink': it enables to get directly to the desired resource.
+
+thierry@Ubuntu-thierry:~$ curl http://localhost:8080/api/v1/pods/ | grep kubernetes-bootcamp
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0        "name": "kubernetes-bootcamp-69fbc6f4cf-k2t92",
+        "generateName": "kubernetes-bootcamp-69fbc6f4cf-",
+        "selfLink": "/api/v1/namespaces/default/pods/kubernetes-bootcamp-69fbc6f4cf-k2t92",
+          "app": "kubernetes-bootcamp",
+            "name": "kubernetes-bootcamp-69fbc6f4cf",
+            "name": "kubernetes-bootcamp",
+            "image": "gcr.io/google-samples/kubernetes-bootcamp:v1",
+            "name": "kubernetes-bootcamp",
+            "image": "gcr.io/google-samples/kubernetes-bootcamp:v1",
+            "imageID": "docker-pullable://gcr.io/google-samples/kubernetes-bootcamp@sha256:0d6b8ee63bb57c5f5b6156f446b3bc3b3c143d233037f3a2f00e279c8fcc64af",
+100  107k    0  107k    0     0  8260k      0 --:--:-- --:--:-- --:--:-- 8260k
+
+So we will now poll specifically this URL:
+
+thierry@Ubuntu-thierry:~$ curl http://localhost:8080/api/v1/namespaces/default/pods/kubernetes-bootcamp-69fbc6f4cf-k2t92
+{
+  "kind": "Pod",
+  "apiVersion": "v1",
+  "metadata": {
+    "name": "kubernetes-bootcamp-69fbc6f4cf-k2t92",
+    "generateName": "kubernetes-bootcamp-69fbc6f4cf-",
+    "namespace": "default",
+    "selfLink": "/api/v1/namespaces/default/pods/kubernetes-bootcamp-69fbc6f4cf-k2t92",
+    "uid": "a189ecfb-d15c-4821-a85d-f0f78e84ebff",
+    "resourceVersion": "12202",
+    "creationTimestamp": "2019-12-27T16:44:58Z",
+    "labels": {
+      "app": "kubernetes-bootcamp",
+      "pod-template-hash": "69fbc6f4cf"
+    },
+    "ownerReferences": [
+      {
+        "apiVersion": "apps/v1",
+        "kind": "ReplicaSet",
+        "name": "kubernetes-bootcamp-69fbc6f4cf",
+        "uid": "93668656-01ef-437f-8088-b5e863a0289b",
+        "controller": true,
+        "blockOwnerDeletion": true
+      }
+    ]
+  },
+  "spec": {
+    "volumes": [
+      {
+        "name": "default-token-hk4xc",
+        "secret": {
+          "secretName": "default-token-hk4xc",
+          "defaultMode": 420
+        }
+      }
+    ],
+    "containers": [
+      {
+        "name": "kubernetes-bootcamp",
+        "image": "gcr.io/google-samples/kubernetes-bootcamp:v1",
+        "resources": {
+          
+        },
+        "volumeMounts": [
+          {
+            "name": "default-token-hk4xc",
+            "readOnly": true,
+            "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount"
+          }
+        ],
+        "terminationMessagePath": "/dev/termination-log",
+        "terminationMessagePolicy": "File",
+        "imagePullPolicy": "IfNotPresent"
+      }
+    ],
+    "restartPolicy": "Always",
+    "terminationGracePeriodSeconds": 30,
+    "dnsPolicy": "ClusterFirst",
+    "serviceAccountName": "default",
+    "serviceAccount": "default",
+    "nodeName": "k8s-slave2",
+    "securityContext": {
+      
+    },
+    "schedulerName": "default-scheduler",
+    "tolerations": [
+      {
+        "key": "node.kubernetes.io/not-ready",
+        "operator": "Exists",
+        "effect": "NoExecute",
+        "tolerationSeconds": 300
+      },
+      {
+        "key": "node.kubernetes.io/unreachable",
+        "operator": "Exists",
+        "effect": "NoExecute",
+        "tolerationSeconds": 300
+      }
+    ],
+    "priority": 0,
+    "enableServiceLinks": true
+  },
+  "status": {
+    "phase": "Running",
+    "conditions": [
+      {
+        "type": "Initialized",
+        "status": "True",
+        "lastProbeTime": null,
+        "lastTransitionTime": "2019-12-27T16:44:58Z"
+      },
+      {
+        "type": "Ready",
+        "status": "True",
+        "lastProbeTime": null,
+        "lastTransitionTime": "2019-12-27T16:45:14Z"
+      },
+      {
+        "type": "ContainersReady",
+        "status": "True",
+        "lastProbeTime": null,
+        "lastTransitionTime": "2019-12-27T16:45:14Z"
+      },
+      {
+        "type": "PodScheduled",
+        "status": "True",
+        "lastProbeTime": null,
+        "lastTransitionTime": "2019-12-27T16:44:58Z"
+      }
+    ],
+    "hostIP": "10.0.2.15",
+    "podIP": "10.244.2.2",
+    "podIPs": [
+      {
+        "ip": "10.244.2.2"
+      }
+    ],
+    "startTime": "2019-12-27T16:44:58Z",
+    "containerStatuses": [
+      {
+        "name": "kubernetes-bootcamp",
+        "state": {
+          "running": {
+            "startedAt": "2019-12-27T16:45:13Z"
+          }
+        },
+        "lastState": {
+          
+        },
+        "ready": true,
+        "restartCount": 0,
+        "image": "gcr.io/google-samples/kubernetes-bootcamp:v1",
+        "imageID": "docker-pullable://gcr.io/google-samples/kubernetes-bootcamp@sha256:0d6b8ee63bb57c5f5b6156f446b3bc3b3c143d233037f3a2f00e279c8fcc64af",
+        "containerID": "docker://aff46533626e6cfdff6b3ecef622e33eed0f00260465a6924d1f1620cca6c447",
+        "started": true
+      }
+    ],
+    "qosClass": "BestEffort"
+  }
+}
+
+Pretty verbose, huh...
+At least, it enables to demonstrate that we can access the cluster from the 
+host machine, and poll directly the REST APIs to retrieve information about 
+the currently rdeployed applications. Interestingly, doing so manually, we 
+operate exactly the same way kubectl or the dashboard do: they poll the REST 
+APIs exposed by the cluster.
 
 
-3.4.6 - View the container logs
+
+The url structure is self explicit:
+    - it specifies the API version (v1 since several versions of K8s)
+    - it then indicated the namespace (here: 'default')
+    - and then indicates the resource we need to poll (pods, deployment...).
+      In our case, we indicate 'pods' and which Pod (with its name) we want 
+      information on.
+
+
+4.5 - View the container logs
 ==============================
 
 Anything that the application would normally send to STDOUT becomes logs for 
 the container within the Pod. We can retrieve these logs using the kubectl 
 logs command:
 
-$ kubectl logs $POD_NAME
+thierry@Ubuntu-thierry:~$kubectl logs $POD_NAME
+Error from server (NotFound): the server could not find the requested resource ( pods/log kubernetes-bootcamp-69fbc6f4cf-k2t92)
+
+We still face the same issue that the cluster surprisingly knows the Pod, but 
+cannot retrieve the logs from it. Maybe is it related to the way I have 
+configured the cluster...
 
 Note: We don’t need to specify the container name, because we only have one 
 container inside the pod.
 
 
-3.4.7 - Executing command on the container
-=========================================
+4.6 - Executing command inside the container
+============================================
 
-We can execute commands directly on the container once the Pod is up and 
+We can execute commands directly in the container once the Pod is up and 
 running. For this, we use the exec command and use the name of the Pod as a 
 parameter. Let’s list the environment variables:
 
