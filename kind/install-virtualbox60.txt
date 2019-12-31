@@ -1,0 +1,54 @@
+How To Install VirtualBox 6.0 on Ubuntu 18.04 LTS
+
+(https://tecadmin.net/install-virtualbox-on-ubuntu-18-04/)
+
+Oracle VirtualBox 6.0.0 has been released on December 18, 2018. Oracle 
+VirtualBox 6.0 is the latest major release after launched by Oracle team. You 
+can read the ChangeLog to know more about changes in newer version’s of 
+VirtualBox. This tutorial will help you to install VirtualBox on Ubuntu 18.04 
+LTS Bionic Beaver Linux systems.
+
+
+Step 1 – Prerequsities
+======================
+
+Login to your Ubuntu 18.04 desktop system with sudo privileged user. After 
+login to your system update current packages of the system to the latest 
+version.
+
+sudo apt update
+sudo apt upgrade
+
+
+Step 2 – Setup Apt Repository
+=============================
+
+Now, import the Oracle public key to your system signed the Debian packages 
+using the following commands.
+
+wget -q https://www.virtualbox.org/download/oracle_vbox_2016.asc -O- | sudo apt-key add -
+wget -q https://www.virtualbox.org/download/oracle_vbox.asc -O- | sudo apt-key add -
+
+Then, you need to add Oracle VirtualBox PPA to Ubuntu system. You can do this 
+by running the below command on your system.
+
+sudo add-apt-repository "deb http://download.virtualbox.org/virtualbox/debian bionic contrib"
+
+This command will add an entry to /etc/apt/sources.list at end of the file.
+
+
+Step 3 – Install VirtualBox on Ubuntu 18.04
+===========================================
+
+After completing the above steps, let’s install VirtualBox using the following commands. If you have already installed an older version of VirtualBox, Below command will update it automatically.
+
+sudo apt update
+sudo apt install virtualbox-6.0
+
+
+Step 4 – Launch VirtualBox
+==========================
+
+We can use dashboard shortcuts to start VirtualBox or simply run following command from a terminal.
+
+virtualbox
