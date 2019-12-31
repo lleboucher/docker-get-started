@@ -68,7 +68,7 @@ Let’s deploy our first app on Kubernetes with the 'kubectl create deployment'
 command. We need to provide the deployment name and app image location 
 (include the full repository url for images hosted outside Docker hub).
 
-thierry@Ubuntu-thierry:~$ kubectl create deployment hello --image=gcr.io/google-samples/node-hello:1.0 
+tso@laptop:~$ kubectl create deployment hello --image=gcr.io/google-samples/node-hello:1.0 
 deployment.apps/hello created
 
 Great! You just deployed your first application by creating a deployment 
@@ -80,8 +80,8 @@ Great! You just deployed your first application by creating a deployment
 You can see it from the terminal:
 
 tso@laptop:/projects/kind$ kubectl get pods -o wide
-NAME                    READY   STATUS    RESTARTS   AGE    IP           NODE          NOMINATED NODE   READINESS GATES
-hello-7747bc55f-p486h   1/1     Running   0          2m6s   10.244.2.5   kind-worker   <none>           <none>
+NAME                    READY   STATUS    RESTARTS   AGE    IP           NODE              NOMINATED NODE   READINESS GATES
+hello-7747bc55f-2t4tb   1/1     Running   0          2m3s   10.244.1.2   newyear-worker2   <none>           <none>
 
 
     Note: from now on, we assume that you will go frequently on the dashboard 
@@ -133,7 +133,8 @@ that this Pod is running on the slave 1.
 
 tso@laptop:/projects/kind$ kubectl get pods -o wide
 NAME                    READY   STATUS    RESTARTS   AGE    IP           NODE          NOMINATED NODE   READINESS GATES
-hello-7747bc55f-p486h   1/1     Running   0          2m6s   10.244.2.5   kind-worker   <none>           <none>
+hello-7747bc55f-2t4tb   1/1     Running   0          2m3s   10.244.1.2   newyear-worker2   <none>           <none>
+
 
 
 3 - Connecting to your app from within the cluster
@@ -152,7 +153,7 @@ while its running.
 
 If you terminated the proxy, we will restart it in a second terminal tab:
 
-tso@laptop:/projects/kind$ gnome-terminal bash --tab -- kubectl proxy -p 8080
+tso@laptop:~$ gnome-terminal bash --tab -- kubectl proxy -p 8080
 Starting to serve on 127.0.0.1:8080
 
 The proxy enables direct access to the API from these terminals: you can see 
@@ -183,10 +184,10 @@ POD_NAME:
 
 tso@laptop:~$ export POD_NAME=$(kubectl get pods -o go-template --template '{{range .items}}{{.metadata.name}}{{"\n"}}{{end}}')
 tso@laptop:~$ echo $POD_NAME
-hello-7747bc55f-p486h
+hello-7747bc55f-2t4tb
 
 In order for the new deployment to be accessible without using the Proxy, a 
-Service is required which will be explained in the next modules.
+'Service' is required which will be explained in the next modules.
 
 
 4 - Explore your app
@@ -256,34 +257,34 @@ kubernetes-bootcamp pod runs on the slave 2. Now, let's view what containers
 are inside that Pod and what images are used to build those containers. To do 
 so, we run the describe pods command:
 
-thierry@Ubuntu-thierry:~$ kubectl describe pods
-Name:         kubernetes-bootcamp-69fbc6f4cf-k2t92
+tso@laptop:~$ kubectl describe pods
+Name:         hello-7747bc55f-2t4tb
 Namespace:    default
 Priority:     0
-Node:         k8s-slave2/10.0.2.15
-Start Time:   Fri, 27 Dec 2019 17:44:58 +0100
-Labels:       app=kubernetes-bootcamp
-              pod-template-hash=69fbc6f4cf
+Node:         newyear-worker2/172.17.0.2
+Start Time:   Tue, 31 Dec 2019 15:28:15 +0100
+Labels:       app=hello
+              pod-template-hash=7747bc55f
 Annotations:  <none>
 Status:       Running
-IP:           10.244.2.2
+IP:           10.244.1.2
 IPs:
-  IP:           10.244.2.2
-Controlled By:  ReplicaSet/kubernetes-bootcamp-69fbc6f4cf
+  IP:           10.244.1.2
+Controlled By:  ReplicaSet/hello-7747bc55f
 Containers:
-  kubernetes-bootcamp:
-    Container ID:   docker://aff46533626e6cfdff6b3ecef622e33eed0f00260465a6924d1f1620cca6c447
-    Image:          gcr.io/google-samples/kubernetes-bootcamp:v1
-    Image ID:       docker-pullable://gcr.io/google-samples/kubernetes-bootcamp@sha256:0d6b8ee63bb57c5f5b6156f446b3bc3b3c143d233037f3a2f00e279c8fcc64af
+  node-hello:
+    Container ID:   containerd://61562b770e3723a442af35e32d15998c01de8da7fa6eeaf49058dcc9c31b5f63
+    Image:          gcr.io/google-samples/node-hello:1.0
+    Image ID:       sha256:9ef4b4c241fc28ce894a57a7cb218b796838fdccf15515d784791abc2ffc1ee6
     Port:           <none>
     Host Port:      <none>
     State:          Running
-      Started:      Fri, 27 Dec 2019 17:45:13 +0100
+      Started:      Tue, 31 Dec 2019 15:28:38 +0100
     Ready:          True
     Restart Count:  0
     Environment:    <none>
     Mounts:
-      /var/run/secrets/kubernetes.io/serviceaccount from default-token-hk4xc (ro)
+      /var/run/secrets/kubernetes.io/serviceaccount from default-token-ltwvj (ro)
 Conditions:
   Type              Status
   Initialized       True 
@@ -291,22 +292,22 @@ Conditions:
   ContainersReady   True 
   PodScheduled      True 
 Volumes:
-  default-token-hk4xc:
+  default-token-ltwvj:
     Type:        Secret (a volume populated by a Secret)
-    SecretName:  default-token-hk4xc
+    SecretName:  default-token-ltwvj
     Optional:    false
 QoS Class:       BestEffort
 Node-Selectors:  <none>
 Tolerations:     node.kubernetes.io/not-ready:NoExecute for 300s
                  node.kubernetes.io/unreachable:NoExecute for 300s
 Events:
-  Type    Reason     Age   From                 Message
-  ----    ------     ----  ----                 -------
-  Normal  Scheduled  29m   default-scheduler    Successfully assigned default/kubernetes-bootcamp-69fbc6f4cf-k2t92 to k8s-slave2
-  Normal  Pulling    29m   kubelet, k8s-slave2  Pulling image "gcr.io/google-samples/kubernetes-bootcamp:v1"
-  Normal  Pulled     29m   kubelet, k8s-slave2  Successfully pulled image "gcr.io/google-samples/kubernetes-bootcamp:v1"
-  Normal  Created    29m   kubelet, k8s-slave2  Created container kubernetes-bootcamp
-  Normal  Started    29m   kubelet, k8s-slave2  Started container kubernetes-bootcamp
+  Type    Reason     Age    From                      Message
+  ----    ------     ----   ----                      -------
+  Normal  Scheduled  5m18s  default-scheduler         Successfully assigned default/hello-7747bc55f-2t4tb to newyear-worker2
+  Normal  Pulling    5m18s  kubelet, newyear-worker2  Pulling image "gcr.io/google-samples/node-hello:1.0"
+  Normal  Pulled     4m55s  kubelet, newyear-worker2  Successfully pulled image "gcr.io/google-samples/node-hello:1.0"
+  Normal  Created    4m55s  kubelet, newyear-worker2  Created container node-hello
+  Normal  Started    4m55s  kubelet, newyear-worker2  Started container node-hello
 
 
 Whaou... Plenty of information is available, as you can see: IP address, the 
@@ -332,16 +333,17 @@ You have store the Pod name in the POD_NAME environment variable.
 
 To see the output of our application, run a curl request.
 
-thierry@Ubuntu-thierry:~$ kubectl get namespace
+tso@laptop:~$ kubectl get namespace
 NAME                   STATUS   AGE
-default                Active   129m
-kube-node-lease        Active   129m
-kube-public            Active   129m
-kube-system            Active   129m
-kubernetes-dashboard   Active   104m
-thierry@Ubuntu-thierry:~$ echo $POD_NAME
-kubernetes-bootcamp-69fbc6f4cf-k2t92
-thierry@Ubuntu-thierry:~$ curl http://localhost:8080/api/v1/namespace/default/pods/$POD_NAME/
+default                Active   10m
+kube-node-lease        Active   10m
+kube-public            Active   10m
+kube-system            Active   10m
+kubernetes-dashboard   Active   8m55s
+
+tso@laptop:~$ echo $POD_NAME
+hello-7747bc55f-2t4tb
+tso@laptop:~$ curl http://localhost:8080/api/v1/namespace/default/pods/$POD_NAME/
 {
   "kind": "Status",
   "apiVersion": "v1",
@@ -358,51 +360,52 @@ thierry@Ubuntu-thierry:~$ curl http://localhost:8080/api/v1/namespace/default/po
 }
 
 Arg... Can't see why it does not show the details, while everything is 
-available on the dashboard... Since I get a lot of detils when polling the 
+available on the dashboard... Since I get a lot of details when polling the 
 'pods' URL (curl http://localhost:8080/api/v1/pods/), I guess htat this is 
 related to not having the right API signature...
 
-Let's try it from another angle: we first list the pods and grep the 'kubernetes-bootcamp' from it. There is an interesting field called 'selfLink': it enables to get directly to the desired resource.
+Let's try it from another angle: we first list the pods and grep the 'hello' 
+tag from it. There is an interesting field called 'selfLink': it enables to get 
+directly to the desired resource.
 
-thierry@Ubuntu-thierry:~$ curl http://localhost:8080/api/v1/pods/ | grep kubernetes-bootcamp
+tso@laptop:~$ curl http://localhost:8080/api/v1/pods/ | grep hello
   % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
                                  Dload  Upload   Total   Spent    Left  Speed
-  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0        "name": "kubernetes-bootcamp-69fbc6f4cf-k2t92",
-        "generateName": "kubernetes-bootcamp-69fbc6f4cf-",
-        "selfLink": "/api/v1/namespaces/default/pods/kubernetes-bootcamp-69fbc6f4cf-k2t92",
-          "app": "kubernetes-bootcamp",
-            "name": "kubernetes-bootcamp-69fbc6f4cf",
-            "name": "kubernetes-bootcamp",
-            "image": "gcr.io/google-samples/kubernetes-bootcamp:v1",
-            "name": "kubernetes-bootcamp",
-            "image": "gcr.io/google-samples/kubernetes-bootcamp:v1",
-            "imageID": "docker-pullable://gcr.io/google-samples/kubernetes-bootcamp@sha256:0d6b8ee63bb57c5f5b6156f446b3bc3b3c143d233037f3a2f00e279c8fcc64af",
-100  107k    0  107k    0     0  8260k      0 --:--:-- --:--:-- --:--:-- 8260k
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0        "name": "hello-7747bc55f-2t4tb",
+        "generateName": "hello-7747bc55f-",
+        "selfLink": "/api/v1/namespaces/default/pods/hello-7747bc55f-2t4tb",
+          "app": "hello",
+            "name": "hello-7747bc55f",
+            "name": "node-hello",
+            "image": "gcr.io/google-samples/node-hello:1.0",
+            "name": "node-hello",
+            "image": "gcr.io/google-samples/node-hello:1.0",
+100 98274    0 98274    0     0  10.4M      0 --:--:-- --:--:-- --:--:-- 10.4M
 
 So we will now poll specifically this URL:
 
-thierry@Ubuntu-thierry:~$ curl http://localhost:8080/api/v1/namespaces/default/pods/kubernetes-bootcamp-69fbc6f4cf-k2t92
+tso@laptop:~$ curl http://localhost:8080/api/v1/namespaces/default/pods/hello-7747bc55f-2t4tb
 {
   "kind": "Pod",
   "apiVersion": "v1",
   "metadata": {
-    "name": "kubernetes-bootcamp-69fbc6f4cf-k2t92",
-    "generateName": "kubernetes-bootcamp-69fbc6f4cf-",
+    "name": "hello-7747bc55f-2t4tb",
+    "generateName": "hello-7747bc55f-",
     "namespace": "default",
-    "selfLink": "/api/v1/namespaces/default/pods/kubernetes-bootcamp-69fbc6f4cf-k2t92",
-    "uid": "a189ecfb-d15c-4821-a85d-f0f78e84ebff",
-    "resourceVersion": "12202",
-    "creationTimestamp": "2019-12-27T16:44:58Z",
+    "selfLink": "/api/v1/namespaces/default/pods/hello-7747bc55f-2t4tb",
+    "uid": "234edbc5-5c11-4622-8773-b9ebf36e544d",
+    "resourceVersion": "960",
+    "creationTimestamp": "2019-12-31T14:28:15Z",
     "labels": {
-      "app": "kubernetes-bootcamp",
-      "pod-template-hash": "69fbc6f4cf"
+      "app": "hello",
+      "pod-template-hash": "7747bc55f"
     },
     "ownerReferences": [
       {
         "apiVersion": "apps/v1",
         "kind": "ReplicaSet",
-        "name": "kubernetes-bootcamp-69fbc6f4cf",
-        "uid": "93668656-01ef-437f-8088-b5e863a0289b",
+        "name": "hello-7747bc55f",
+        "uid": "94023a2f-3d0d-4eda-b69f-c2b4b6071cc2",
         "controller": true,
         "blockOwnerDeletion": true
       }
@@ -411,23 +414,23 @@ thierry@Ubuntu-thierry:~$ curl http://localhost:8080/api/v1/namespaces/default/p
   "spec": {
     "volumes": [
       {
-        "name": "default-token-hk4xc",
+        "name": "default-token-ltwvj",
         "secret": {
-          "secretName": "default-token-hk4xc",
+          "secretName": "default-token-ltwvj",
           "defaultMode": 420
         }
       }
     ],
     "containers": [
       {
-        "name": "kubernetes-bootcamp",
-        "image": "gcr.io/google-samples/kubernetes-bootcamp:v1",
+        "name": "node-hello",
+        "image": "gcr.io/google-samples/node-hello:1.0",
         "resources": {
           
         },
         "volumeMounts": [
           {
-            "name": "default-token-hk4xc",
+            "name": "default-token-ltwvj",
             "readOnly": true,
             "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount"
           }
@@ -442,7 +445,7 @@ thierry@Ubuntu-thierry:~$ curl http://localhost:8080/api/v1/namespaces/default/p
     "dnsPolicy": "ClusterFirst",
     "serviceAccountName": "default",
     "serviceAccount": "default",
-    "nodeName": "k8s-slave2",
+    "nodeName": "newyear-worker2",
     "securityContext": {
       
     },
@@ -471,41 +474,41 @@ thierry@Ubuntu-thierry:~$ curl http://localhost:8080/api/v1/namespaces/default/p
         "type": "Initialized",
         "status": "True",
         "lastProbeTime": null,
-        "lastTransitionTime": "2019-12-27T16:44:58Z"
+        "lastTransitionTime": "2019-12-31T14:28:15Z"
       },
       {
         "type": "Ready",
         "status": "True",
         "lastProbeTime": null,
-        "lastTransitionTime": "2019-12-27T16:45:14Z"
+        "lastTransitionTime": "2019-12-31T14:28:39Z"
       },
       {
         "type": "ContainersReady",
         "status": "True",
         "lastProbeTime": null,
-        "lastTransitionTime": "2019-12-27T16:45:14Z"
+        "lastTransitionTime": "2019-12-31T14:28:39Z"
       },
       {
         "type": "PodScheduled",
         "status": "True",
         "lastProbeTime": null,
-        "lastTransitionTime": "2019-12-27T16:44:58Z"
+        "lastTransitionTime": "2019-12-31T14:28:15Z"
       }
     ],
-    "hostIP": "10.0.2.15",
-    "podIP": "10.244.2.2",
+    "hostIP": "172.17.0.2",
+    "podIP": "10.244.1.2",
     "podIPs": [
       {
-        "ip": "10.244.2.2"
+        "ip": "10.244.1.2"
       }
     ],
-    "startTime": "2019-12-27T16:44:58Z",
+    "startTime": "2019-12-31T14:28:15Z",
     "containerStatuses": [
       {
-        "name": "kubernetes-bootcamp",
+        "name": "node-hello",
         "state": {
           "running": {
-            "startedAt": "2019-12-27T16:45:13Z"
+            "startedAt": "2019-12-31T14:28:38Z"
           }
         },
         "lastState": {
@@ -513,9 +516,9 @@ thierry@Ubuntu-thierry:~$ curl http://localhost:8080/api/v1/namespaces/default/p
         },
         "ready": true,
         "restartCount": 0,
-        "image": "gcr.io/google-samples/kubernetes-bootcamp:v1",
-        "imageID": "docker-pullable://gcr.io/google-samples/kubernetes-bootcamp@sha256:0d6b8ee63bb57c5f5b6156f446b3bc3b3c143d233037f3a2f00e279c8fcc64af",
-        "containerID": "docker://aff46533626e6cfdff6b3ecef622e33eed0f00260465a6924d1f1620cca6c447",
+        "image": "gcr.io/google-samples/node-hello:1.0",
+        "imageID": "sha256:9ef4b4c241fc28ce894a57a7cb218b796838fdccf15515d784791abc2ffc1ee6",
+        "containerID": "containerd://61562b770e3723a442af35e32d15998c01de8da7fa6eeaf49058dcc9c31b5f63",
         "started": true
       }
     ],
@@ -533,7 +536,7 @@ APIs exposed by the cluster.
 
 
 The url structure is self explicit:
-    - it specifies the API version (v1 since several versions of K8s)
+    - it specifies the API version (v1 since versions 1.15 at least)
     - it then indicated the namespace (here: 'default')
     - and then indicates the resource we need to poll (pods, deployment...).
       In our case, we indicate 'pods' and which Pod (with its name) we want 
@@ -547,8 +550,8 @@ Anything that the application would normally send to STDOUT becomes logs for
 the container within the Pod. We can retrieve these logs using the kubectl 
 logs command:
 
-thierry@Ubuntu-thierry:~$kubectl logs $POD_NAME
-Error from server (NotFound): the server could not find the requested resource ( pods/log kubernetes-bootcamp-69fbc6f4cf-k2t92)
+tso@laptop:~$kubectl logs $POD_NAME
+(no answer!!!)
 
 We still face the same issue that the cluster surprisingly knows the Pod, but 
 cannot retrieve the logs from it. Maybe is it related to the way I have 
@@ -565,24 +568,64 @@ We can execute commands directly in the container once the Pod is up and
 running. For this, we use the exec command and use the name of the Pod as a 
 parameter. Let’s list the environment variables:
 
-$ kubectl exec $POD_NAME env
+tso@laptop:~$ kubectl exec $POD_NAME env
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+HOSTNAME=hello-7747bc55f-2t4tb
+NPM_CONFIG_LOGLEVEL=info
+NODE_VERSION=4.4.2
+KUBERNETES_PORT=tcp://10.96.0.1:443
+KUBERNETES_PORT_443_TCP=tcp://10.96.0.1:443
+KUBERNETES_PORT_443_TCP_PROTO=tcp
+KUBERNETES_PORT_443_TCP_PORT=443
+KUBERNETES_PORT_443_TCP_ADDR=10.96.0.1
+KUBERNETES_SERVICE_HOST=10.96.0.1
+KUBERNETES_SERVICE_PORT=443
+KUBERNETES_SERVICE_PORT_HTTPS=443
+HOME=/root
 
 Again, worth mentioning that the name of the container itself can be omitted 
 since we only have a single container in the Pod.
 
 Next let’s start a bash session in the Pod’s container:
 
-$ kubectl exec -ti $POD_NAME bash
+tso@laptop:~$ kubectl exec -ti $POD_NAME bash
+root@hello-7747bc55f-2t4tb:/# 
 
 We have now an open console on the container where we run our NodeJS 
 application, and we are logged as root. The source code of the app is in the 
 server.js file:
 
-# cat server.js
+root@hello-7747bc55f-2t4tb:/# cat server.js
+// Copyright 2016, Google, Inc.
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//    http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+'use strict';
+
+// [START all]
+var http = require('http');
+var handleRequest = function(request, response) {
+    response.writeHead(200);
+    response.end('Hello Kubernetes!');
+};
+var www = http.createServer(handleRequest);
+www.listen(process.env.PORT || 8080);
+// [END all]
+
 
 You can check that the application is up by running a curl command:
 
-# curl localhost:8080
+root@hello-7747bc55f-2t4tb:/# curl localhost:8080
+Hello Kubernetes!
 
     Note: here we used localhost because we executed the command inside the 
         NodeJS Pod. If you cannot connect to localhost:8080, check to make 
@@ -598,7 +641,7 @@ To close your container connection type "exit".
 
 
 3.5.1 - Overview of Kubernetes Services
-=====================================
+=======================================
 
 Kubernetes Pods are mortal. Pods in fact have a lifecycle. When a worker node 
 dies, the Pods running on the Node are also lost. A ReplicaSet might then 
@@ -615,9 +658,8 @@ A Service in Kubernetes is an abstraction which defines a logical set of Pods
 and a policy by which to access them. Services enable a loose coupling between 
 dependent Pods. A Service is defined using YAML (preferred) or JSON, like all 
 Kubernetes objects. The set of Pods targeted by a Service is usually 
-determined by a LabelSelector (see below for why you might want a Service 
-without including selector in the spec): a LabelSelector is a the way 
-Kubernetes will identify the right pods
+determined by a LabelSelector: a LabelSelector is a the usual way Kubernetes 
+will identify the right pods.
 
 Although each Pod has a unique IP address, those IPs are not exposed outside 
 the cluster without a Service. Services allow your applications to receive 
@@ -627,16 +669,25 @@ ServiceSpec:
 
     - ClusterIP (default) - Exposes the Service on an internal IP in the 
         cluster. This type makes the Service only reachable from within the 
-        cluster.
+        cluster, by other services running on the same cluster.
     - NodePort - Exposes the Service on the same port of each selected Node in 
         the cluster using NAT. Makes a Service accessible from outside the 
         cluster using <NodeIP>:<NodePort>. Superset of ClusterIP.
+        The principle here is that the <NodeIP> is shared by all services 
+        running on the same cluster: they only differentiate one from another 
+        by their port number. This is very convenient to enable a controlled 
+        communication between services, typically when they should primarily 
+        get exposed via an API gateway which will handle security and access 
+        rights.
     - LoadBalancer - Creates an external load balancer in the current cloud 
         (if supported) and assigns a fixed, external IP to the Service. 
         Superset of NodePort.
+        Here, the service has its own IP and its own (set of) port(s): it is 
+        very easily reacheable from outside the cluster, which implies that it 
+        must embed security by design.
     - ExternalName - Exposes the Service using an arbitrary name (specified by 
         externalName in the spec) by returning a CNAME record with the name. 
-        No proxy is used. This type requires v1.7 or higher of kube-dns.
+        No proxy is used (requires v1.7 or higher of kube-dns).
 
 
 Additionally, note that there are some use cases with Services that involve 
@@ -647,7 +698,7 @@ may be no selector is you are strictly using type: ExternalName.
 
 
 3.5.2 - Services and Labels
-=========================
+===========================
 
 (image: "expose your app - 1")
 
@@ -675,52 +726,93 @@ apply some labels.
 3.5.3 - Create a new service
 ============================
 
+
 Let’s verify that our application is running. We’ll use the kubectl get 
 command and look for existing Pods:
 
-$ kubectl get pods
-
-If no pods are running then it means the interactive environment is still 
-reloading its previous state. Please wait a couple of seconds and list the 
-Pods again. You can continue once you see the one Pod running.
+tso@laptop:~$ kubectl get pods
+NAME                    READY   STATUS    RESTARTS   AGE
+hello-7747bc55f-2t4tb   1/1     Running   0          19m
 
 Next, let’s list the current Services from our cluster:
 
-$ kubectl get services
-NAME        TYPE        CLUSTER-IP  EXTERNAL-IP     PORT(S)     AGE
-kubernetes  ClusterUP   10.96.0.1   <none>          443/TCP     89s
+tso@laptop:~$ kubectl get services
+NAME         TYPE        CLUSTER-IP   EXTERNAL-IP   PORT(S)   AGE
+kubernetes   ClusterIP   10.96.0.1    <none>        443/TCP   24m
 
-We have a Service called kubernetes that is created by default when minikube 
-starts the cluster. To create a new service and expose it to external traffic 
-we’ll use the expose command with NodePort as parameter (minikube does not 
-support the LoadBalancer option yet).
+We have a Service called kubernetes that is created by default when the cluster  
+starts. To create a new service and expose it to external traffic we’ll use the 
+'expose' command with NodePort as parameter.
 
-$ kubectl expose deployment/kubernetes-bootcamp --type="NodePort" --port 8080
-service/kubernetes-bootcamp exposed
+tso@laptop:~$ kubectl expose deployment/hello --type="NodePort" --port 8080
+service/hello exposed
 
 Let’s run again the get services command:
 
-$ kubectl get services
+tso@laptop:~$ kubectl get services
+NAME         TYPE        CLUSTER-IP    EXTERNAL-IP   PORT(S)          AGE
+hello        NodePort    10.96.14.33   <none>        8080:32267/TCP   20s
+kubernetes   ClusterIP   10.96.0.1     <none>        443/TCP          25m
 
-We have now a running Service called kubernetes-bootcamp. Here we see that 
-the Service received a unique cluster-IP, an internal port and an external-IP 
-(the IP of the Node).
+Yes: we have now a running Service called 'hello'. Here we see that the Service 
+received a unique cluster-IP, an internal port and an external-IP (the IP of 
+the Node).
 
 To find out what port was opened externally (by the NodePort option) we’ll run 
 the describe service command:
 
-$ kubectl describe services/kubernetes-bootcamp
+First we need to identify the port which is exposed by the NodePort option:
 
-Create an environment variable called NODE_PORT that has the value of the Node 
-port assigned:
+tso@laptop:~$ kubectl describe services/hello
+Name:                     hello
+Namespace:                default
+Labels:                   app=hello
+Annotations:              <none>
+Selector:                 app=hello
+Type:                     NodePort
+IP:                       10.96.14.33
+Port:                     <unset>  8080/TCP
+TargetPort:               8080/TCP
+NodePort:                 <unset>  32267/TCP
+Endpoints:                10.244.1.2:8080
+Session Affinity:         None
+External Traffic Policy:  Cluster
+Events:                   <none>
 
-$ export NODE_PORT=$(kubectl get services/kubernetes-bootcamp -o go-template='{{(index .spec.ports 0).nodePort}}')
-echo NODE_PORT=$NODE_PORT
+We ceate an environment variable called NODE_PORT that has the value of the 
+Node port assigned:
 
-Now we can test that the app is exposed outside of the cluster using curl, the 
-IP of the Node and the externally exposed port:
+tso@laptop:~$ export NODE_PORT=32267
 
-$ curl $(minikube ip):$NODE_PORT
+Then we need to identify the external IP which is exposed for the whole 
+cluster: this ip is used as teh 'endpoint' for the default 'kubernetes' 
+service:
+
+tso@laptop:~$ kubectl describe services/kubernetes
+Name:              kubernetes
+Namespace:         default
+Labels:            component=apiserver
+                   provider=kubernetes
+Annotations:       <none>
+Selector:          <none>
+Type:              ClusterIP
+IP:                10.96.0.1
+Port:              https  443/TCP
+TargetPort:        6443/TCP
+Endpoints:         172.17.0.4:6443
+Session Affinity:  None
+Events:            <none>
+
+Here we can see the cluster's shared Endpoint: 172.17.0.4.
+
+tso@laptop:~$ export ENDPOINT=172.17.0.4
+
+Now that we have both the ip@ (172.17.0.4) and the port (32267), we can test 
+that the app is exposed outside of the cluster using curl:
+
+tso@laptop:~$ curl $ENDPOINT:$NODE_PORT
+Hello Kubernetes!
+tso@laptop:~$ 
 
 And we get a response from the server. The Service is exposed.
 
