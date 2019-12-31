@@ -174,7 +174,7 @@ UUID=96b5fd56-93ab-4512-a2da-c89f56a73da3 / ext4 defaults 0 0
 
 We will then install Kubernetes: collect the certificates, add the signing 
 key to the local apt repository, add the google kubernetes repository... and 
-finally install docker:
+finally install kubernetes:
 
 root@k8s_node:/# curl -s https://packages.cloud.google.com/apt/doc/apt-key.gpg | apt-key add -
 root@k8s_node:/# add-apt-repository "deb http://apt.kubernetes.io/ kubernetes-xenial main"
