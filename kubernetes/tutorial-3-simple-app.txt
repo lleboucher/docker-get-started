@@ -9,7 +9,19 @@
 ==========================
 
 Once you have a running Kubernetes cluster, you can deploy your containerized 
-applications on top of it. To deploy your containerized application on top of the cluster, you create what is called a "Kubernetes Deployment". The Deployment maerializes through a text file (yet another a YAML file) which defines the target state of your application (which application - i.e. which Docker container or which set of containers - will compose your application, on how many nodes - in order to bring resilience - or other criterias your application should respect once it is actually deployed on the cluster). This text file instructs Kubernetes how to create and update instances of your application (actually, it tells the Kubernetes Controller Manager to spawn a Deployment Controller which will read this text file: the Deployment Controller will tell the Kubernetes master how to 'schedules' the pods onto individual Nodes in the cluster, each pod carrying the containers composing your application).
+applications on top of it. To deploy your containerized application on top of 
+the cluster, you create what is called a "Kubernetes Deployment". The 
+Deployment maerializes through a text file (yet another a YAML file) which 
+defines the target state of your application (which application - i.e. which 
+Docker container or which set of containers - will compose your application, on 
+how many nodes - in order to bring resilience - or other criterias your 
+application should respect once it is actually deployed on the cluster). This 
+text file instructs Kubernetes how to create and update instances of your 
+application (actually, it tells the Kubernetes Controller Manager to spawn a 
+Deployment Controller which will read this text file: the Deployment Controller 
+will tell the Kubernetes master how to 'schedules' the pods onto individual 
+Nodes in the cluster, each pod carrying the containers composing your 
+application).
 
 Once the application instances are created, the Kubernetes Deployment 
 Controller continuously monitors those instances. If the Node hosting an 
@@ -62,14 +74,15 @@ deployment.apps/hello created
 Great! You just deployed your first application by creating a deployment 
 (which you can also see in the dashboard (image: 
 'dashboard-deployment-first'). You can also see that it created a Pod called 
-'kubernetes-bootcamp-69fbc6f4cf-k2t92' as it is visible on the dashboard 
+'hello-7747bc55f-p486h' as it is visible on the dashboard 
 (image: 'dashboard-pod-bootcamp').
 
 You can see it from the terminal:
 
-thierry@Ubuntu-thierry:~$ kubectl get pods
-NAME                                   READY   STATUS    RESTARTS   AGE
-kubernetes-bootcamp-69fbc6f4cf-k2t92   1/1     Running   0          4m26s
+tso@laptop:/projects/kind$ kubectl get pods -o wide
+NAME                    READY   STATUS    RESTARTS   AGE    IP           NODE          NOMINATED NODE   READINESS GATES
+hello-7747bc55f-p486h   1/1     Running   0          2m6s   10.244.2.5   kind-worker   <none>           <none>
+
 
     Note: from now on, we assume that you will go frequently on the dashboard 
         to check the changes happening on the cluster, and we will focus the 
@@ -92,9 +105,10 @@ This 'create deployment' command performed a few things for you:
 
 To list your deployments use the get deployments command:
 
-thierry@Ubuntu-thierry:~$ kubectl get deployments
-NAME                  READY   UP-TO-DATE   AVAILABLE   AGE
-kubernetes-bootcamp   1/1     1            1           8m25s
+tso@laptop:/projects/kind$ kubectl get deployments
+NAME    READY   UP-TO-DATE   AVAILABLE   AGE
+hello   1/1     1            1           2m33s
+
 
 Let's details this line since you will see later in the tutorial many results 
 similar to this one:
@@ -115,11 +129,11 @@ similar to this one:
 We can see here that there is 1 deployment, running 1 single instance of your 
 app. The instance is running inside a Docker container on one of the nodes. To 
 get more details, we expand the results of the 'get pods' command: we can see 
-that this Pod is running on the slave 2.
+that this Pod is running on the slave 1.
 
-thierry@Ubuntu-thierry:~$ kubectl get pods -o wide
-NAME                                   READY   STATUS    RESTARTS   AGE   IP           NODE         NOMINATED NODE   READINESS GATES
-kubernetes-bootcamp-69fbc6f4cf-k2t92   1/1     Running   0          17m   10.244.2.2   k8s-slave2   <none>           <none>
+tso@laptop:/projects/kind$ kubectl get pods -o wide
+NAME                    READY   STATUS    RESTARTS   AGE    IP           NODE          NOMINATED NODE   READINESS GATES
+hello-7747bc55f-p486h   1/1     Running   0          2m6s   10.244.2.5   kind-worker   <none>           <none>
 
 
 3 - Connecting to your app from within the cluster
@@ -131,33 +145,29 @@ same kubernetes cluster, but not outside that network. When we use kubectl,
 we're interacting through an API endpoint to communicate with our application.
 
 We will cover other options on how to expose your application outside the 
-kubernetes cluster in the later section.
+kubernetes cluster in the later section. For the moment, we will still use the 
+proxy that will forward communications into the cluster-wide, private network. 
+The proxy can be terminated by pressing control-C and won't show any output 
+while its running.
 
-The kubectl command can create a proxy that will forward communications into 
-the cluster-wide, private network. The proxy can be terminated by pressing 
-control-C and won't show any output while its running.
+If you terminated the proxy, we will restart it in a second terminal tab:
 
-We will open a second terminal window to run the proxy.
-
-thierry@Ubuntu-thierry:~$ kubectl proxy -p 8080
+tso@laptop:/projects/kind$ gnome-terminal bash --tab -- kubectl proxy -p 8080
 Starting to serve on 127.0.0.1:8080
 
-We now have a connection between our host (the online terminal) and the 
-Kubernetes cluster. The proxy enables direct access to the API from these 
-terminals.
+The proxy enables direct access to the API from these terminals: you can see 
+all those APIs hosted through the proxy endpoint. For example, we can query the 
+version directly through the API using the curl command:
 
-You can see all those APIs hosted through the proxy endpoint. For example, we 
-can query the version directly through the API using the curl command:
-
-thierry@Ubuntu-thierry:~$ curl http://localhost:8080/version
+tso@laptop:~$ curl http://localhost:8080/version
 {
   "major": "1",
-  "minor": "17",
-  "gitVersion": "v1.17.0",
-  "gitCommit": "70132b0f130acc0bed193d9ba59dd186f0e634cf",
+  "minor": "16",
+  "gitVersion": "v1.16.3",
+  "gitCommit": "b3cbbae08ec52a7fc73d334838e18d17e8512749",
   "gitTreeState": "clean",
-  "buildDate": "2019-12-07T21:12:17Z",
-  "goVersion": "go1.13.4",
+  "buildDate": "2019-12-04T07:23:47Z",
+  "goVersion": "go1.12.12",
   "compiler": "gc",
   "platform": "linux/amd64"
 }
@@ -171,14 +181,9 @@ the pod name, that is also accessible through the proxy.
 First we need to get the Pod name, and we'll store in the environment variable 
 POD_NAME:
 
-thierry@Ubuntu-thierry:~$ export POD_NAME=$(kubectl get pods -o go-template --template '{{range .items}}{{.metadata.name}}{{"\n"}}{{end}}')
-thierry@Ubuntu-thierry:~$ echo Name of the Pod: $POD_NAME
-Name of the Pod: kubernetes-bootcamp-69fbc6f4cf-k2t92
-
-    Note: Check the top of the terminal. The proxy was run in a new tab 
-        (Terminal 2), and the recent commands were executed the original tab 
-        (Terminal 1). The proxy still runs in the second tab, and this allowed 
-        our curl command to work using localhost:8080.
+tso@laptop:~$ export POD_NAME=$(kubectl get pods -o go-template --template '{{range .items}}{{.metadata.name}}{{"\n"}}{{end}}')
+tso@laptop:~$ echo $POD_NAME
+hello-7747bc55f-p486h
 
 In order for the new deployment to be accessible without using the Proxy, a 
 Service is required which will be explained in the next modules.
