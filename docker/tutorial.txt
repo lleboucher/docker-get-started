@@ -773,10 +773,10 @@ You now have two VMs created, named myvm1 and myvm2.
 Use this command to list the machines and get their IP addresses.
 
 $ docker-machine ls
-NAME    ACTIVE   DRIVER       STATE     URL                         SWARM   DOCKER        ERRORS
-myvm1   -        virtualbox   Running   tcp://192.168.99.100:2376           v18.06.1-ce   
-myvm2   -        virtualbox   Running   tcp://192.168.99.101:2376           v18.06.1-ce   
-myvm3   -        virtualbox   Running   tcp://192.168.99.102:2376           v18.06.1-ce   
+NAME    ACTIVE   DRIVER       STATE     URL                         SWARM   DOCKER     ERRORS
+myvm1   -        virtualbox   Running   tcp://192.168.99.100:2376           v19.03.5   
+myvm2   -        virtualbox   Running   tcp://192.168.99.101:2376           v19.03.5   
+myvm3   -        virtualbox   Running   tcp://192.168.99.102:2376           v19.03.5
 
 
 Initialize the swarm
@@ -789,47 +789,64 @@ a swarm manager with docker swarm init and look for output like this:
 
 docker-machine ssh myvm1 "docker swarm init --advertise-addr <myvm1 ip>"
 
-$ docker-machine ssh myvm1 "docker swarm init --advertise-addr 192.168.99.100"
-Swarm initialized: current node (ap5tosjk9gztbkrvh5ddh8zyx) is now a manager.
+More elegantly, we will actually spawn a new terminal tab for each VM, use 
+docker-machine to connect (via SSH) into the VM, and - from the VM - initialize 
+the swarm (for VM1) or join the swarm (VM2 and VM3):
+
+$ gnome-terminal --tab --tab --tab
+
+In the second tab, we will log into VM1 and initialize the swam:
+
+tso@laptop:~$ docker-machine ssh myvm1
+docker@myvm1:~$ docker swarm init --advertise-addr 192.168.99.100
+Swarm initialized: current node (jo9p4yihnnvu2wu4r1vx09gmc) is now a manager.
 
 To add a worker to this swarm, run the following command:
 
-    docker swarm join --token SWMTKN-1-3d1offc9hznxlgkc1v2z4iecsk7o1o8azotl8eiacwnqhu0sh4-96swe6v7gvryu49yy3bx8mwlx 192.168.99.100:2377
+    docker swarm join --token SWMTKN-1-45tzwsnjei5f5c3k9l9i8y7zbxje750f5accagd82oqriq8z8s-abtnq3asuu168095qf326i5n8 192.168.99.100:2377
 
 To add a manager to this swarm, run 'docker swarm join-token manager' and follow the instructions.
+
+We keep preciously these connection instruction: the other nodes will not be 
+able to join the swarm if they don't know the token.
 
 
 Add nodes to the swarm
 ======================
 
-To add a worker to this swarm, we use the docker command:
+So, we conitnue logging into the next VM and joining it to the swarm. To do so, 
+we use the docker command:
 
    docker swarm join --token <token> <myvm ip>:<port>
 
-As you can see above, the response to docker swarm init contains a 
-pre-configured docker swarm join command for you to run on any nodes you
-want to add. Copy this command, and send it to myvm2 and myvm3 via 
-"docker-machine ssh" to have myvm2 and myvm3 join your new swarm as workers:
+We will use the token which is included in the response to docker swarm init: 
+copy this command, and send it from myvm2 and myvm3 via:
 
-  docker-machine ssh myvm2 "docker swarm join --token <token> <ip>:2377"
+docker swarm join --token <token> <ip>:2377"
 
 In this case:
 
-$ docker-machine ssh myvm2 "docker swarm join --token SWMTKN-1-3d1offc9hznxlgkc1v2z4iecsk7o1o8azotl8eiacwnqhu0sh4-96swe6v7gvryu49yy3bx8mwlx 192.168.99.100:2377"
+tso@laptop:~$ docker-machine ssh myvm2
+docker@myvm2:~$ docker swarm join --token SWMTKN-1-45tzwsnjei5f5c3k9l9i8y7zbxje750f5accagd82oqriq8z8s-abtnq3asuu168095qf326i5n8 192.168.99.100:2377
 This node joined a swarm as a worker.
-$ docker-machine ssh myvm3 "docker swarm join --token SWMTKN-1-3d1offc9hznxlgkc1v2z4iecsk7o1o8azotl8eiacwnqhu0sh4-96swe6v7gvryu49yy3bx8mwlx 192.168.99.100:2377"
+
+and:
+
+tso@laptop:~$ docker-machine ssh myvm3
+docker@myvm3:~$ docker swarm join --token SWMTKN-1-45tzwsnjei5f5c3k9l9i8y7zbxje750f5accagd82oqriq8z8s-abtnq3asuu168095qf326i5n8 192.168.99.100:2377
 This node joined a swarm as a worker.
 
 Congratulations, you have created your first swarm of 3 VMs!
+
 Run docker node ls on the manager to view the nodes in this swarm:
 
-$ docker-machine ssh myvm1 "docker node ls"
+docker@myvm1:~$ docker node ls
 ID                            HOSTNAME            STATUS              AVAILABILITY        MANAGER STATUS      ENGINE VERSION
-ap5tosjk9gztbkrvh5ddh8zyx *   myvm1               Ready               Active              Leader              18.06.1-ce
-y0q4ot44y4cerdxjkhrgjbksy     myvm2               Ready               Active                                  18.06.1-ce
-u9cirzdca37rhtyl0ayk2llpu     myvm3               Ready               Active                                  18.06.1-ce
+jo9p4yihnnvu2wu4r1vx09gmc *   myvm1               Ready               Active              Leader              19.03.5
+fkfmmeirve311smrdd1s2dld4     myvm2               Ready               Active                                  19.03.5
+0lajp4xuakprqorap8ezgdu3s     myvm3               Ready               Active                                  19.03.5
 
-As you can see, all three VMs appear in teh list, and 'myvm1' is indicated
+As you can see, all three VMs appear in the list, and 'myvm1' is indicated
 as the 'leader' of the swarm.
 
 
@@ -852,21 +869,23 @@ Configure a docker-machine shell to the swarm manager
 =====================================================
 
 So far, you’ve been wrapping Docker commands in docker-machine ssh to talk to
-the VMs. Another option is to run docker-machine env <machine> to get and run
-a command that configures your current shell to talk to the Docker daemon on
-the VM. This method works better for the next step because it allows you to
-use your local docker-compose.yml file to deploy the app “remotely” without
-having to copy it anywhere.
+the VMs, or you logged directly into the VM (via SSH) in order to place orders. 
+Another option is to run docker-machine env <machine> to get and run a command 
+that configures your current shell to talk to the Docker daemon on the VM. This 
+method works better for the next step because it allows you to use your local 
+copy of the docker-compose.yml file (oon your laptop) to deploy the app 
+“remotely” without having to copy it inside the VM1.
 
 $ docker-machine env myvm1
 export DOCKER_TLS_VERIFY="1"
 export DOCKER_HOST="tcp://192.168.99.100:2376"
-export DOCKER_CERT_PATH="/Users/sam/.docker/machine/machines/myvm1"
+export DOCKER_CERT_PATH="/home/tso/.docker/machine/machines/myvm1"
 export DOCKER_MACHINE_NAME="myvm1"
+# Run this command to configure your shell: 
+# eval $(docker-machine env myvm1)
 
-Either type "docker-machine env myvm1", then copy-paste and run the command 
-provided as the last line of the output to configure your shell to talk to 
-myvm1, the swarm manager, or use the "eval" shell command to do the job:
+
+We just have to follow the instructions:
 
 $ eval $(docker-machine env myvm1)
 
@@ -875,9 +894,9 @@ indicated by the asterisk next to it.
 
 $ docker-machine ls
 NAME    ACTIVE   DRIVER       STATE     URL                         SWARM   DOCKER        ERRORS
-myvm1   *        virtualbox   Running   tcp://192.168.99.100:2376           v18.06.1-ce   
-myvm2   -        virtualbox   Running   tcp://192.168.99.101:2376           v18.06.1-ce   
-myvm3   -        virtualbox   Running   tcp://192.168.99.102:2376           v18.06.1-ce   
+myvm1   *        virtualbox   Running   tcp://192.168.99.100:2376           v19.03.5   
+myvm2   -        virtualbox   Running   tcp://192.168.99.101:2376           v19.03.5   
+myvm3   -        virtualbox   Running   tcp://192.168.99.102:2376           v19.03.5   
 
 
 Deploy the app on the swarm manager
@@ -898,6 +917,8 @@ docker-compose.yml file you created in part 3.
 Just like before, run the following command to deploy the app on myvm1.
 
 $ docker stack deploy -c docker-compose-part3.yml getstartedlab
+Creating network getstartedlab_webnet
+Creating service getstartedlab_web
 
 And that’s it, the app is deployed on a swarm cluster!
 
@@ -921,15 +942,15 @@ notice that the services (and associated containers) have been distributed
 between both myvm1 and myvm2.
 
 $ docker stack ps getstartedlab
-ID                  NAME                  IMAGE                       NODE                DESIRED STATE       CURRENT STATE            ERROR               PORTS
-mb6s6ms6hisk        getstartedlab_web.1   tsouche/get-started:part2   myvm2               Running             Running 56 seconds ago                     
-p9t1qttdfnb0        getstartedlab_web.2   tsouche/get-started:part2   myvm3               Running             Running 56 seconds ago                       
-v8mothjknpiz        getstartedlab_web.3   tsouche/get-started:part2   myvm1               Running             Running 56 seconds ago                       
-jiwxtixwv856        getstartedlab_web.4   tsouche/get-started:part2   myvm2               Running             Running 56 seconds ago                       
-o64zcc2f9nsw        getstartedlab_web.5   tsouche/get-started:part2   myvm3               Running             Running 56 seconds ago                       
-uq0alv3b7pj7        getstartedlab_web.6   tsouche/get-started:part2   myvm2               Running             Running 56 seconds ago                       
-4uxnjtynnotx        getstartedlab_web.7   tsouche/get-started:part2   myvm3               Running             Running 56 seconds ago                       
-oi500u4oht5g        getstartedlab_web.8   tsouche/get-started:part2   myvm1               Running             Running 56 seconds ago       
+ID                  NAME                  IMAGE                       NODE                DESIRED STATE       CURRENT STATE                ERROR               PORTS
+xr369odnin3x        getstartedlab_web.1   tsouche/get-started:part2   myvm2               Running             Running about a minute ago                       
+i0cy5sv9y4l0        getstartedlab_web.2   tsouche/get-started:part2   myvm3               Running             Running about a minute ago                       
+sqnb23j0n6xr        getstartedlab_web.3   tsouche/get-started:part2   myvm2               Running             Running about a minute ago                       
+hnt4hndfqxd2        getstartedlab_web.4   tsouche/get-started:part2   myvm3               Running             Running about a minute ago                       
+l41yrxn5vavl        getstartedlab_web.5   tsouche/get-started:part2   myvm1               Running             Running about a minute ago                       
+wkzok2n1kjb1        getstartedlab_web.6   tsouche/get-started:part2   myvm1               Running             Running about a minute ago                            
+g3igrtiezmhe        getstartedlab_web.7   tsouche/get-started:part2   myvm1               Running             Running about a minute ago                            
+r8xs2ytlwtvz        getstartedlab_web.8   tsouche/get-started:part2   myvm3               Running             Running about a minute ago  
 
 
 Connecting to VMs with docker-machine env and docker-machine ssh
@@ -964,24 +985,25 @@ docker-machine ls to get your VMs’ IP addresses and visit either of them on a
 browser, hitting refresh. In order to show the result, we use curl:
 
 $ curl http://192.168.99.100:4000
-<h3>Hello World!</h3><b>Hostname:</b> 0ceb2a65a04a<br/><b>Visits:</b> <i>cannot connect to Redis, counter disabled</i>
+<h3>Hello World!</h3><b>Hostname:</b> 160f2964ebb1<br/><b>Visits:</b> <i>cannot connect to Redis, counter disabled</i>
 $ curl http://192.168.99.100:4000
-<h3>Hello World!</h3><b>Hostname:</b> 0c24412a6624<br/><b>Visits:</b> <i>cannot connect to Redis, counter disabled</i>
+<h3>Hello World!</h3><b>Hostname:</b> d0da3840a388<br/><b>Visits:</b> <i>cannot connect to Redis, counter disabled</i>
 $ curl http://192.168.99.100:4000
-<h3>Hello World!</h3><b>Hostname:</b> 8a04213c521b<br/><b>Visits:</b> <i>cannot connect to Redis, counter disabled</i>
+<h3>Hello World!</h3><b>Hostname:</b> a2e30e45b9c4<br/><b>Visits:</b> <i>cannot connect to Redis, counter disabled</i>
 $ curl http://192.168.99.100:4000
-<h3>Hello World!</h3><b>Hostname:</b> c77a037bf25a<br/><b>Visits:</b> <i>cannot connect to Redis, counter disabled</i>
+<h3>Hello World!</h3><b>Hostname:</b> a10839a1e4a8<br/><b>Visits:</b> <i>cannot connect to Redis, counter disabled</i>
 $ curl http://192.168.99.100:4000
-<h3>Hello World!</h3><b>Hostname:</b> 42312171a3aa<br/><b>Visits:</b> <i>cannot connect to Redis, counter disabled</i>
+<h3>Hello World!</h3><b>Hostname:</b> c49b406440d2<br/><b>Visits:</b> <i>cannot connect to Redis, counter disabled</i>
 $ curl http://192.168.99.100:4000
-<h3>Hello World!</h3><b>Hostname:</b> c366ee1ac5db<br/><b>Visits:</b> <i>cannot connect to Redis, counter disabled</i>
+<h3>Hello World!</h3><b>Hostname:</b> 05994270e546<br/><b>Visits:</b> <i>cannot connect to Redis, counter disabled</i>
 $ curl http://192.168.99.100:4000
-<h3>Hello World!</h3><b>Hostname:</b> 0e61cf037b36<br/><b>Visits:</b> <i>cannot connect to Redis, counter disabled</i>
+<h3>Hello World!</h3><b>Hostname:</b> 1cd9df25ec42<br/><b>Visits:</b> <i>cannot connect to Redis, counter disabled</i>
+
 ...
 
 There are eight possible container IDs all cycling by randomly, demonstrating 
 the load-balancing.
-The reason both IP addresses work is that nodes in a swarm participate in an 
+The reason all 3 IP addresses work is that nodes in a swarm participate in an 
 ingress routing mesh. This ensures that a service deployed at a certain port
 within your swarm always has that port reserved to itself, no matter what 
 node is actually running the container.
@@ -1021,6 +1043,8 @@ Cleanup and reboot Stacks and swarms
 You can tear down the stack with docker stack rm. For example:
 
 $ docker stack rm getstartedlab
+Removing service getstartedlab_web
+Removing network getstartedlab_webnet
 
 Keep the swarm or remove it?
 
@@ -1174,8 +1198,9 @@ Re-run the docker stack deploy command on the manager, and whatever services
 need updating are updated:
 
 $ docker stack deploy -c docker-compose-part5-1.yml getstartedlab
-Updating service getstartedlab_web (id: angi1bf5e4to03qu9f93trnxm)
-Creating service getstartedlab_visualizer (id: l9mnwkeq2jiononb5ihz9u7a4)
+Creating network getstartedlab_webnet
+Creating service getstartedlab_visualizer
+Creating service getstartedlab_web
 
 
 Take a look at the visualizer
@@ -1191,24 +1216,16 @@ the 8 instances of web are spread out across the swarm. You can corroborate
 this visualization by running docker stack ps <stack>:
 
 $ docker stack ps getstartedlab
-ID                  NAME                         IMAGE                             NODE                DESIRED STATE       CURRENT STATE                 ERROR               PORTS
-jvrrglt4we25        getstartedlab_web.1          tsouche/get-started:part2         myvm2               Running             Running 2 minutes ago
-zhtftfvhhmgx        getstartedlab_visualizer.1   dockersamples/visualizer:stable   myvm1               Running             Running 3 minutes ago
-mb6s6ms6hisk        getstartedlab_web.1          tsouche/get-started:part2         myvm2               Shutdown            Shutdown 2 minutes ago
-usya0lcee6m8        getstartedlab_web.2          tsouche/get-started:part2         myvm3               Running             Running 2 minutes ago
-p9t1qttdfnb0         \_ getstartedlab_web.2      tsouche/get-started:part2         myvm3               Shutdown            Shutdown 2 minutes ago
-swb6b46bnild        getstartedlab_web.3          tsouche/get-started:part2         myvm1               Running             Running about a minute ago
-v8mothjknpiz         \_ getstartedlab_web.3      tsouche/get-started:part2         myvm1               Shutdown            Shutdown about a minute ago
-hwx5vmaxs263        getstartedlab_web.4          tsouche/get-started:part2         myvm1               Running             Running 3 minutes ago
-jiwxtixwv856         \_ getstartedlab_web.4      tsouche/get-started:part2         myvm2               Shutdown            Shutdown 3 minutes ago
-8g8sq7ay5zin        getstartedlab_web.5          tsouche/get-started:part2         myvm2               Running             Running 2 minutes ago
-o64zcc2f9nsw         \_ getstartedlab_web.5      tsouche/get-started:part2         myvm3               Shutdown            Shutdown 2 minutes ago
-sip3a4ujqvsx        getstartedlab_web.6          tsouche/get-started:part2         myvm2               Running             Running about a minute ago
-uq0alv3b7pj7         \_ getstartedlab_web.6      tsouche/get-started:part2         myvm2               Shutdown            Shutdown about a minute ago
-f1xs1n13pepe        getstartedlab_web.7          tsouche/get-started:part2         myvm3               Running             Running about a minute ago
-4uxnjtynnotx         \_ getstartedlab_web.7      tsouche/get-started:part2         myvm3               Shutdown            Shutdown about a minute ago
-1mlwxv0hbp09        getstartedlab_web.8          tsouche/get-started:part2         myvm3               Running             Running 2 minutes ago
-oi500u4oht5g         \_ getstartedlab_web.8      tsouche/get-started:part2         myvm1               Shutdown            Shutdown 2 minutes ago
+ID                  NAME                         IMAGE                             NODE                DESIRED STATE       CURRENT STATE            ERROR               PORTS
+kb8e3d7iqj76        getstartedlab_web.1          tsouche/get-started:part2         myvm3               Running             Running 59 seconds ago                       
+puk3a65hf5up        getstartedlab_visualizer.1   dockersamples/visualizer:stable   myvm1               Running             Running 50 seconds ago                       
+zr4jjcvrr0l5        getstartedlab_web.2          tsouche/get-started:part2         myvm1               Running             Running 58 seconds ago                       
+v6a1qd49a0ka        getstartedlab_web.3          tsouche/get-started:part2         myvm2               Running             Running 59 seconds ago                       
+x0gq7usig5y6        getstartedlab_web.4          tsouche/get-started:part2         myvm3               Running             Running 59 seconds ago                       
+9uxjs2ve3x1s        getstartedlab_web.5          tsouche/get-started:part2         myvm1               Running             Running 58 seconds ago                       
+4r6a1dxxlh0e        getstartedlab_web.6          tsouche/get-started:part2         myvm2               Running             Running 59 seconds ago                       
+pqxvp3m14loh        getstartedlab_web.7          tsouche/get-started:part2         myvm3               Running             Running 59 seconds ago                       
+gs5ox6yvnumw        getstartedlab_web.8          tsouche/get-started:part2         myvm2               Running             Running 59 seconds ago                       
 
 
 As you can see, the previous containers were stopped and replaced with the
@@ -1279,48 +1296,83 @@ Run docker stack deploy one more time
 =====================================
 
 $ docker stack deploy -c docker-compose-part5-2.yml getstartedlab
+Updating service getstartedlab_web (id: 2ythn4okhrdcnnj2o7ecmjbcl)
+Updating service getstartedlab_visualizer (id: tufou3x0sztx69eg6kzfmzvi8)
+Creating service getstartedlab_redis
 
-Run docker service ls to verify that the three services are running as 
-expected.
+Run docker service ls from the VM1 to verify that the three services are 
+running as expected.
 
-$ docker service ls
+docker@myvm1:~$ docker service ls
 ID                  NAME                       MODE                REPLICAS            IMAGE                             PORTS
-tnulz7df0rrz        getstartedlab_redis        replicated          1/1                 redis:latest                      *:6379->6379/tcp
-jmuyc5gaolnf        getstartedlab_visualizer   replicated          1/1                 dockersamples/visualizer:stable   *:8080->8080/tcp
-xtenq4cmm1ti        getstartedlab_web          replicated          8/8                 tsouche/get-started:part2         *:80->80/tcp
-$ docker stack ps getstartedlab
-ID                  NAME                         IMAGE                             NODE                DESIRED STATE       CURRENT STATE             ERROR                              PORTS
-n462bnffvyto        getstartedlab_redis.1        redis:latest                      myvm1               Running             Running 14 seconds ago
-jvrrglt4we25        getstartedlab_web.1          tsouche/get-started:part2         myvm2               Running             Running 14 minutes ago
-zhtftfvhhmgx        getstartedlab_visualizer.1   dockersamples/visualizer:stable   myvm1               Running             Running 14 minutes ago
-usya0lcee6m8        getstartedlab_web.2          tsouche/get-started:part2         myvm3               Running             Running 13 minutes ago
-swb6b46bnild        getstartedlab_web.3          tsouche/get-started:part2         myvm1               Running             Running 13 minutes ago
-hwx5vmaxs263        getstartedlab_web.4          tsouche/get-started:part2         myvm1               Running             Running 14 minutes ago
-8g8sq7ay5zin        getstartedlab_web.5          tsouche/get-started:part2         myvm2               Running             Running 14 minutes ago
-sip3a4ujqvsx        getstartedlab_web.6          tsouche/get-started:part2         myvm2               Running             Running 13 minutes ago
-f1xs1n13pepe        getstartedlab_web.7          tsouche/get-started:part2         myvm3               Running             Running 12 minutes ago
-1mlwxv0hbp09        getstartedlab_web.8          tsouche/get-started:part2         myvm3               Running             Running 13 minutes ago
+ugr2oqhctk52        getstartedlab_redis        replicated          1/1                 redis:latest                      *:6379->6379/tcp
+tufou3x0sztx        getstartedlab_visualizer   replicated          1/1                 dockersamples/visualizer:stable   *:8080->8080/tcp
+2ythn4okhrdc        getstartedlab_web          replicated          8/8                 tsouche/get-started:part2         *:80->80/tcp
+
+docker@myvm1:~$ docker stack ps getstartedlab                                                                                                                                                             
+ID                  NAME                         IMAGE                             NODE                DESIRED STATE       CURRENT STATE                ERROR               PORTS
+hcvuq1nt48hp        getstartedlab_redis.1        redis:latest                      myvm1               Running             Running about a minute ago                       
+kb8e3d7iqj76        getstartedlab_web.1          tsouche/get-started:part2         myvm3               Running             Running 5 minutes ago                            
+puk3a65hf5up        getstartedlab_visualizer.1   dockersamples/visualizer:stable   myvm1               Running             Running 5 minutes ago                            
+zr4jjcvrr0l5        getstartedlab_web.2          tsouche/get-started:part2         myvm1               Running             Running 5 minutes ago                            
+v6a1qd49a0ka        getstartedlab_web.3          tsouche/get-started:part2         myvm2               Running             Running 5 minutes ago                            
+x0gq7usig5y6        getstartedlab_web.4          tsouche/get-started:part2         myvm3               Running             Running 5 minutes ago                            
+9uxjs2ve3x1s        getstartedlab_web.5          tsouche/get-started:part2         myvm1               Running             Running 5 minutes ago                            
+4r6a1dxxlh0e        getstartedlab_web.6          tsouche/get-started:part2         myvm2               Running             Running 5 minutes ago                            
+pqxvp3m14loh        getstartedlab_web.7          tsouche/get-started:part2         myvm3               Running             Running 5 minutes ago                            
+gs5ox6yvnumw        getstartedlab_web.8          tsouche/get-started:part2         myvm2               Running             Running 5 minutes ago 
 
 
 Check the web page at one of your nodes, such as http://192.168.99.101, and 
 take a look at the results of the visitor counter, which is now live and 
 storing information on Redis.
 
-Also, check the visualizer at port 8080 on either node’s IP address, and 
-notice see the redis service running along with the web and visualizer
-services. We can show it here with curl:
+Now come back to the host, and check the visualizer at port 8080 on either 
+node’s IP address, and notice see the redis service running along with the web 
+and visualizer services. We can show it here with curl:
 
-$ curl http://192.168.99.101
-<h3>Hello World!</h3><b>Hostname:</b> 0f43ddc93fc2<br/><b>Visits:</b> 1
-$ curl http://192.168.99.101
-<h3>Hello World!</h3><b>Hostname:</b> 0f43ddc93fc2<br/><b>Visits:</b> 2
-$ curl http://192.168.99.101
-<h3>Hello World!</h3><b>Hostname:</b> 0f43ddc93fc2<br/><b>Visits:</b> 3
-$ curl http://192.168.99.101
-<h3>Hello World!</h3><b>Hostname:</b> 0f43ddc93fc2<br/><b>Visits:</b> 4
-$ curl http://192.168.99.101
-<h3>Hello World!</h3><b>Hostname:</b> 0f43ddc93fc2<br/><b>Visits:</b> 5
+tso@laptop:~$ curl http://192.168.99.101
+<h3>Hello World!</h3><b>Hostname:</b> 4bf84a659203<br/><b>Visits:</b> 1
+tso@laptop:~$ curl http://192.168.99.101
+<h3>Hello World!</h3><b>Hostname:</b> 6e44c2030d1d<br/><b>Visits:</b> 2
+tso@laptop:~$ curl http://192.168.99.101
+<h3>Hello World!</h3><b>Hostname:</b> 72e463fe35f4<br/><b>Visits:</b> 3
+tso@laptop:~$ curl http://192.168.99.101
+<h3>Hello World!</h3><b>Hostname:</b> de35f3de665f<br/><b>Visits:</b> 4
+tso@laptop:~$ curl http://192.168.99.101
+<h3>Hello World!</h3><b>Hostname:</b> 84fe0906e70b<br/><b>Visits:</b> 5
 ...
+
+so go on the browser, visit the '192.168.99.101' URL and observe the result.
+
+
+Cleanup!!!
+==========
+
+Before leaving, tidy the place!
+This means bringing the services down and removing any container/images left.
+
+tso@laptop:~$ docker service ls
+ID                  NAME                       MODE                REPLICAS            IMAGE                             PORTS
+ugr2oqhctk52        getstartedlab_redis        replicated          1/1                 redis:latest                      *:6379->6379/tcp
+tufou3x0sztx        getstartedlab_visualizer   replicated          1/1                 dockersamples/visualizer:stable   *:8080->8080/tcp
+2ythn4okhrdc        getstartedlab_web          replicated          8/8                 tsouche/get-started:part2         *:80->80/tcp
+tso@laptop:~$ docker stack rm getstartedlab
+Removing service getstartedlab_redis
+Removing service getstartedlab_visualizer
+Removing service getstartedlab_web
+Removing network getstartedlab_webnet
+tso@laptop:~$ docker container ls -a
+CONTAINER ID        IMAGE               COMMAND             CREATED             STATUS              PORTS               NAMES
+tso@laptop:~$ docker images -a
+REPOSITORY                 TAG                 IMAGE ID            CREATED             SIZE
+tsouche/get-started        <none>              c160e4abb8aa        About an hour ago   159MB
+redis                      <none>              c33c9b2541a8        2 days ago          98.2MB
+dockersamples/visualizer   <none>              8dbf7c60cf88        2 years ago         148MB
+tso@laptop:/projects/get-started/docker$ docker image rm c160e4abb8aa c33c9b2541a8  8dbf7c60cf88
+...
+
+Here you are :-)
 
 
 =======================
